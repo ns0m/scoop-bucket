@@ -7,7 +7,7 @@
         "Microsoft Visual C++ Redistributable 2015": "extras/vcredist2015"
     },
     "url": "https://downloads.sourceforge.net/project/beebeep/Windows/beebeep-5.8.6-32bit-portable.zip",
-    "hash": "sha256:3998b34e74af403041e74fa685312d9f92ce8eeb574e63e443b57b6968c7f79c",
+    "hash": "3998b34e74af403041e74fa685312d9f92ce8eeb574e63e443b57b6968c7f79c",
     "extract_dir": "beebeep-5.8.6-32bit-portable",
     "bin": "beebeep.exe",
     "shortcuts": [
