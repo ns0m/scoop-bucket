@@ -37,6 +37,6 @@
         "regex": "/download\">Eraser ([\\d.]+)</a>"
     },
     "autoupdate": {
-        "url": "https://downloads.sourceforge.net/project/eraser/Eraser%206/6.2/Eraser%20$version.exe#/dl.7z"
+        "url": "https://downloads.sourceforge.net/project/eraser/Eraser%20$majorVersion/$majorVersion.$minorVersion/Eraser%20$version.exe#/dl.7z"
     }
 }
