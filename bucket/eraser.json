@@ -4,7 +4,7 @@
     "homepage": "https://eraser.heidi.ie/",
     "license": "GPL-3.0-or-later",
     "url": "https://downloads.sourceforge.net/project/eraser/Eraser%206/6.2/Eraser%206.2.0.2993.exe#/dl.7z",
-    "hash": "062ccb4e9e6f90d3e5b0df23a4c85c65690a1b527a70015c914e17468fc74bbc",
+    "hash": "sha1:4264b1e46b1f4d0e98659c8167994197a87f6a11",
     "architecture": {
         "64bit": {
             "installer": {
