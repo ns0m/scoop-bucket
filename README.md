@@ -4,12 +4,18 @@
 
 ns0m Bucket for [Scoop](https://scoop.sh), the Windows command-line installer.
 
-How do I install these manifests?
----------------------------------
+## How do I install these manifests?
 
-To add this bucket, run `scoop bucket add ns0m https://github.com/ns0m/scoop-bucket`. To install, do `scoop install <manifest>`.
+After manifests have been committed and pushed, run the following:
 
-How do I contribute new manifests?
-----------------------------------
+```pwsh
+scoop bucket add ns0m https://github.com/ns0m/scoop-bucket
+scoop install ns0m/<manifestname>
+```
 
-To make a new manifest contribution, please read the [Contributing Guide](https://github.com/ScoopInstaller/.github/blob/main/.github/CONTRIBUTING.md).
+## How do I contribute new manifests?
+
+To make a new manifest contribution, please read the [Contributing
+Guide](https://github.com/ScoopInstaller/.github/blob/main/.github/CONTRIBUTING.md)
+and [App Manifests](https://github.com/ScoopInstaller/Scoop/wiki/App-Manifests)
+wiki page.
