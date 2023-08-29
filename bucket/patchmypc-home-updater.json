@@ -1,10 +1,10 @@
 {
-    "version": "4.5.0.3",
+    "version": "4.5.0.4",
     "description": "Update or install a large list of programs on to your computer",
     "homepage": "https://patchmypc.com/home-updater",
     "license": "Freeware",
     "url": "https://patchmypc.com/freeupdater/PatchMyPC.exe",
-    "hash": "b7f17c4810f6722adc8fe29ad196dc80b14be9e60475faf7a4b7dbae0b21860c",
+    "hash": "1870e1004f3c2f109a3e71a8f65b69d6f8889ce73719e815a15c68e7ea206e3c",
     "pre_install": [
         "if (!(Test-Path \"$persist_dir\\PatchMyPC.ini\")) {",
         "    Set-Content \"$dir\\PatchMyPC.ini\" -Value \";Options`nChk_Options_DisablePatchMyPCSelfUpdater\" -Encoding 'utf8' -Force",
