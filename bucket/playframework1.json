@@ -1,0 +1,17 @@
+{
+    "version": "1.7.1",
+    "description": "Makes it easier to build Web applications with Java",
+    "homepage": "https://github.com/playframework/play1",
+    "license": "Apache-2.0",
+    "depends": "python",
+    "url": "https://github.com/playframework/play1/releases/download/1.7.1/play-1.7.1.zip",
+    "hash": "deca2c18800ce3688ad328243bb937400ccf78a510fb18afe81d54a81086cb3e",
+    "extract_dir": "play-1.7.1",
+    "post_install": "pip install pywin32",
+    "bin": "play.bat",
+    "checkver": "github",
+    "autoupdate": {
+        "url": "https://github.com/playframework/play1/releases/download/$version/play-$version.zip",
+        "extract_dir": "play-$version"
+    }
+}
