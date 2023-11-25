@@ -1,0 +1,37 @@
+{
+    "version": "5.0.5",
+    "description": "Update your software in 2 clicks. Stay away from malware.",
+    "homepage": "https://www.adlice.com/ucheck/",
+    "license": {
+        "identifier": "Freeware",
+        "url": "https://www.adlice.com/docs/ucheck/terms-of-use/"
+    },
+    "architecture": {
+        "64bit": {
+            "url": "https://download.adlice.com/api?action=download&app=ucheck&type=x64#/UCheck_portable64.exe",
+            "hash": "146a1be028c08d7855d40e832d255a3fba71637671241e9622e492b830daa93a",
+            "bin": "UCheck_portable64.exe",
+            "shortcuts": [
+                [
+                    "UCheck_portable64.exe",
+                    "UCheck"
+                ]
+            ]
+        },
+        "32bit": {
+            "url": "https://download.adlice.com/api?action=download&app=ucheck&type=x86#/UCheck_portable32.exe",
+            "hash": "059592c17d2e0b79cf70700c497b2a53038ed82cd6c059b4a4172970f73f5ae9",
+            "bin": "UCheck_portable32.exe",
+            "shortcuts": [
+                [
+                    "UCheck_portable32.exe",
+                    "UCheck"
+                ]
+            ]
+        }
+    },
+    "checkver": {
+        "url": "https://download.adlice.com/UCheck/Changelog.txt",
+        "regex": "V([\\d.]+)"
+    }
+}
