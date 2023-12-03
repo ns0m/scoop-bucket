@@ -19,5 +19,8 @@
     "checkver": {
         "url": "https://quickinstaller.net/download",
         "regex": "latest version ([\\d.]+)\\. Release Date"
+    },
+    "autoupdate": {
+        "url": "https://app.quickinstaller.net/downloads/QuickInstallerSetup.exe"
     }
 }
