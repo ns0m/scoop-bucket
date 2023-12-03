@@ -33,5 +33,15 @@
     "checkver": {
         "url": "https://download.adlice.com/UCheck/Changelog.txt",
         "regex": "V([\\d.]+)"
+    },
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": "https://download.adlice.com/api?action=download&app=ucheck&type=x64#/UCheck_portable64.exe"
+            },
+            "32bit": {
+                "url": "https://download.adlice.com/api?action=download&app=ucheck&type=x86#/UCheck_portable32.exe"
+            }
+        }
     }
 }
