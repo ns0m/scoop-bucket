@@ -1,5 +1,5 @@
 {
-    "version": "0.2.8747.26076",
+    "version": "0.2.8748.37063",
     "description": "QuickInstaller is a free software updater and installer for Windows for both installers and portable applications.",
     "homepage": "https://quickinstaller.net/",
     "license": {
@@ -7,7 +7,7 @@
         "url": "https://quickinstaller.net/legal/terms-of-service"
     },
     "url": "https://app.quickinstaller.net/downloads/QuickInstallerSetup.exe",
-    "hash": "47ff36ca773f34507d471ee1663860f419eda06a7af58728df62b1861cae0413",
+    "hash": "521820b1508cb90af920898ce25436484c3bb78992f3f37da89e2249a70a3699",
     "innosetup": true,
     "bin": "QuickInstaller.exe",
     "shortcuts": [
