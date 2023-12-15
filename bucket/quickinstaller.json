@@ -7,7 +7,7 @@
         "url": "https://quickinstaller.net/legal/terms-of-service"
     },
     "url": "https://app.quickinstaller.net/downloads/QuickInstallerSetup.exe",
-    "hash": "521820b1508cb90af920898ce25436484c3bb78992f3f37da89e2249a70a3699",
+    "hash": "5bda21a29ed8b7ac786ef577ce2784d996dbb9f065d55df2fb7a39b8087ab648",
     "innosetup": true,
     "bin": "QuickInstaller.exe",
     "shortcuts": [
