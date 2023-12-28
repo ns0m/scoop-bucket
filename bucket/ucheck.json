@@ -1,5 +1,5 @@
 {
-    "version": "5.2.0",
+    "version": "5.2.1",
     "description": "Update your software in 2 clicks. Stay away from malware.",
     "homepage": "https://www.adlice.com/ucheck/",
     "license": {
@@ -9,7 +9,7 @@
     "architecture": {
         "64bit": {
             "url": "https://download.adlice.com/api?action=download&app=ucheck&type=x64#/UCheck_portable64.exe",
-            "hash": "3c96f337c421515ec53896a8923ab4ebadfda8616aa43fc04cbd7d81f4d86775",
+            "hash": "1964031d9afddfaeb0c93a079b8e34794f1382a88454480a52b9dbe5cedbea0f",
             "bin": "UCheck_portable64.exe",
             "shortcuts": [
                 [
@@ -20,7 +20,7 @@
         },
         "32bit": {
             "url": "https://download.adlice.com/api?action=download&app=ucheck&type=x86#/UCheck_portable32.exe",
-            "hash": "680c50668f45aa22fc8379f7cdb14ea11cd57d7e347750900bc3d6bc61b291ac",
+            "hash": "d1f456dc44534c97436b3b534034bb893903e0590ed61632674126ebce81de67",
             "bin": "UCheck_portable32.exe",
             "shortcuts": [
                 [
