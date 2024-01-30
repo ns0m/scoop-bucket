@@ -10,7 +10,6 @@
         "    Set-Content \"$dir\\PatchMyPC.ini\" -Value \";Options`nChk_Options_DisablePatchMyPCSelfUpdater\" -Encoding 'utf8' -Force",
         "}"
     ],
-    "bin": "PatchMyPC.exe",
     "shortcuts": [
         [
             "PatchMyPC.exe",
