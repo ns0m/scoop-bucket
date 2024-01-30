@@ -7,7 +7,6 @@
     "url": "https://singularlabs.com/download/10315/#/ccenhancer.exe",
     "hash": "4d025fad652ec6b890883f64e617f1e5dccfbff0dc857631695c6cf4315c1c23",
     "pre_install": "if (!(Test-Path -Path \"$persist_dir\\cc_config.ini\")) { New-Item -Path \"$dir\\cc_config.ini\" -Value \"UpdateCheck:False`r`n\" | Out-Null }",
-    "bin": "ccenhancer.exe",
     "shortcuts": [
         [
             "ccenhancer.exe",
