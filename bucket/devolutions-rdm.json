@@ -1,0 +1,44 @@
+{
+    "version": "2026.3.16.0",
+    "description": "Devolutions Remote Desktop Manager is a remote connection management software for individual, MSPs, and IT professionals.",
+    "homepage": "https://devolutions.net/remote-desktop-manager/",
+    "license": "Proprietary",
+    "architecture": {
+        "64bit": {
+            "url": "https://cdn.devolutions.net/download/Devolutions.RemoteDesktopManager.win-x64.2026.3.16.0.7z",
+            "hash": "34f1186f689a25a4e5c2c9a3775ded6e6f2e8b2462bd6fa8170131cfd96e3f33"
+        },
+        "arm64": {
+            "url": "https://cdn.devolutions.net/download/Devolutions.RemoteDesktopManager.win-arm64.2026.3.16.0.7z",
+            "hash": "8478898db3302fd1f466befda92c126581f80d018172c6110710bdebb50b2aba"
+        }
+    },
+    "shortcuts": [
+        [
+            "RemoteDesktopManager.exe",
+            "Remote Desktop Manager"
+        ]
+    ],
+    "pre_install": "if (!(Test-Path \"$dir\\override.cfg\")) { Set-Content -Encoding ASCII -Path \"$dir\\override.cfg\" -Value '.\\config' }",
+    "post_install": "Remove-Item \"$dir\\Devolutions.Updater*\" -Force -ErrorAction SilentlyContinue",
+    "persist": [
+        "config",
+        "data",
+        "tools"
+    ],
+    "checkver": {
+        "url": "https://devolutions.net/productinfo.json",
+        "jsonpath": "$.RDMWindows.Current.Version"
+    },
+    "notes": "For full portability, set up your workspace using the relative path '.\\Data\\Connections.db.'",
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": "https://cdn.devolutions.net/download/Devolutions.RemoteDesktopManager.win-x64.$version.7z"
+            },
+            "arm64": {
+                "url": "https://cdn.devolutions.net/download/Devolutions.RemoteDesktopManager.win-arm64.$version.7z"
+            }
+        }
+    }
+}
