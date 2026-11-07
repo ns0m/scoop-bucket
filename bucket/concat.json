@@ -1,0 +1,31 @@
+{
+    "version": "0.2.9",
+    "description": "Free, open-source, local-first video editor, scriptable through a JSON-RPC API and MCP",
+    "homepage": "https://concat.standalones.org",
+    "license": "AGPL-3.0-only",
+    "architecture": {
+        "64bit": {
+            "url": "https://github.com/jub0t/Concat/releases/download/v0.2.9/Concat-0.2.9-windows-x86_64.msi",
+            "hash": "6c6db4110bc351662fb032c1a0ede9ab88e960e41fd025c0adb0ccd7a27443fc"
+        }
+    },
+    "extract_dir": "PFiles64\\Concat",
+    "post_install": "Get-ChildItem \"$dir\" -Filter '*.duplicate*' | Remove-Item -Force",
+    "bin": "concat.exe",
+    "shortcuts": [
+        [
+            "concat.exe",
+            "Concat"
+        ]
+    ],
+    "checkver": {
+        "github": "https://github.com/jub0t/Concat"
+    },
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": "https://github.com/jub0t/Concat/releases/download/v$version/Concat-$version-windows-x86_64.msi"
+            }
+        }
+    }
+}
