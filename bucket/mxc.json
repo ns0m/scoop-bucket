@@ -1,0 +1,31 @@
+{
+    "version": "1.0.1",
+    "description": "Run untrusted code in policy-driven sandboxed containers",
+    "homepage": "https://github.com/microsoft/mxc",
+    "license": "MIT",
+    "url": "https://github.com/microsoft/mxc/releases/download/v1.0.1/mxc-release-binaries.zip",
+    "hash": "0e832239454ba7fcd338ff56218a287eef4c0a01c1484084b869f55feff8abe9",
+    "architecture": {
+        "64bit": {
+            "extract_dir": "x64"
+        },
+        "arm64": {
+            "extract_dir": "arm64"
+        }
+    },
+    "pre_install": "Remove-Item \"$dir\\symbols\", \"$dir\\lxc-exec\", \"$dir\\mxc-exec-mac\", \"$dir\\unix-test-proxy\", \"$dir\\libmxc_ffi.so\" -Recurse -Force -ErrorAction SilentlyContinue",
+    "bin": [
+        "wxc-exec.exe",
+        "mxc-diagnostic-console.exe"
+    ],
+    "notes": [
+        "The processcontainer backend needs Windows 11 24H2 or later with the updates listed at https://github.com/microsoft/mxc/blob/main/docs/backends/process-container/os-version-support.md",
+        "The hyperlight and wslc backends need extra setup: 'wxc-exec --setup-hyperlight' and 'wxc-exec --setup-wslc --image <image>'."
+    ],
+    "checkver": {
+        "github": "https://github.com/microsoft/mxc"
+    },
+    "autoupdate": {
+        "url": "https://github.com/microsoft/mxc/releases/download/v$version/mxc-release-binaries.zip"
+    }
+}
