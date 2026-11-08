@@ -3,7 +3,10 @@
     "description": "Adds 1,000+ new cleaning rules to Piriform CCleaner",
     "homepage": "https://singularlabs.com/software/ccenhancer/",
     "license": "Freeware",
-    "notes": "Microsoft .NET Framework 4.0 or newer is required.",
+    "notes": [
+        "Microsoft .NET Framework 4.0 or newer is required.",
+        "CCEnhancer does not support CCleaner 7.0 or newer."
+    ],
     "url": "https://singularlabs.com/download/10315/#/ccenhancer.exe",
     "hash": "4d025fad652ec6b890883f64e617f1e5dccfbff0dc857631695c6cf4315c1c23",
     "pre_install": "if (!(Test-Path -Path \"$persist_dir\\cc_config.ini\")) { New-Item -Path \"$dir\\cc_config.ini\" -Value \"UpdateCheck:False`r`n\" | Out-Null }",
