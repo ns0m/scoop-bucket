@@ -1,0 +1,48 @@
+name: Trending Review
+
+on:
+  schedule:
+    # Daily at 06:00 UTC
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      languages:
+        description: 'Comma-separated trending languages'
+        required: false
+        default: 'rust,go,zig,c,c++,c#'
+      since:
+        description: 'Trending period (daily, weekly, monthly)'
+        required: false
+        default: 'daily'
+      max_issues:
+        description: 'Max new candidate issues to create per run'
+        required: false
+        default: '5'
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  review:
+    name: Review Trending Candidates
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Bucket
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3'
+
+      - name: Run Trending Review
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TRENDING_LANGUAGES: ${{ github.event.inputs.languages || 'rust,go,zig,c,c++,c#' }}
+          TRENDING_SINCE: ${{ github.event.inputs.since || 'daily' }}
+          MAX_ISSUES: ${{ github.event.inputs.max_issues || '5' }}
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          python3 -B .github/scripts/trending_review.py

@@ -5,3 +5,6 @@ page.html
 checkver-*.html
 .idea/
 *.iml
+__pycache__/
+*.py[cod]
+*$py.class
