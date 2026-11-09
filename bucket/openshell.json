@@ -1,0 +1,27 @@
+{
+    "version": "0.1.5-pre.20261102.5b9e5b91a",
+    "description": "Safe, private runtime for fleets of autonomous AI agents (native Windows build)",
+    "homepage": "https://docs.nvidia.com/openshell/",
+    "license": "Apache-2.0",
+    "url": "https://github.com/ns0m/openshell-windows/releases/download/0.1.5-pre.20261102.5b9e5b91a/openshell-windows-x64.zip",
+    "hash": "96dab873dc5da67e3be94a78e1f5615cd59982283a6358b8ddd2d85f767671b3",
+    "depends": "mxc",
+    "bin": [
+        "openshell.exe",
+        "openshell-gateway.exe",
+        "openshell-supervisor.exe",
+        "openshell-windows-sandbox.exe"
+    ],
+    "notes": [
+        "Unofficial x64 build of the NVIDIA OpenShell 'windows' branch (github.com/ns0m/openshell-windows). Not production-qualified.",
+        "Native sandboxing needs MXC, a host that passes 'wxc-exec --probe', and 'compute_driver = \"mxc\"' plus the absolute path to wxc-exec.exe in gateway.toml.",
+        "The binaries follow an unstable branch and can regress at any time."
+    ],
+    "checkver": {
+        "github": "https://github.com/ns0m/openshell-windows",
+        "regex": "([0-9]+\\.[0-9]+\\.[0-9]+-pre\\.[0-9]+\\.[0-9a-f]+)"
+    },
+    "autoupdate": {
+        "url": "https://github.com/ns0m/openshell-windows/releases/download/$version/openshell-windows-x64.zip"
+    }
+}
