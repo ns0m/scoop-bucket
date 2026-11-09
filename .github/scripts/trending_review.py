@@ -61,7 +61,7 @@ def print_alert(message):
 def warn_github_rate_limit():
     global RATE_LIMIT_WARNED
     if not RATE_LIMIT_WARNED:
-        print_alert("Quota API GitHub anonyme probablement dépassée (60 requêtes/heure). Un GITHUB_TOKEN est facultatif pour augmenter le quota.")
+        print_alert("The unauthenticated GitHub API quota (60 requests/hour) may have been exceeded. GITHUB_TOKEN is optional and increases the quota.")
         RATE_LIMIT_WARNED = True
 
 def get_headers(token=None, github_api=False):
@@ -88,7 +88,7 @@ def encode_lang_slug(lang):
 
 def format_relative_date(iso_str):
     if not iso_str:
-        return "Non spécifiée"
+        return "Not specified"
     try:
         dt = datetime.datetime.fromisoformat(iso_str.replace('Z', '+00:00'))
         now = datetime.datetime.now(datetime.timezone.utc)
@@ -99,17 +99,17 @@ def format_relative_date(iso_str):
         if days < 0:
             return date_str
         elif days == 0:
-            rel = "aujourd'hui"
+            rel = "today"
         elif days == 1:
-            rel = "hier"
+            rel = "yesterday"
         elif days < 30:
-            rel = f"il y a {days} jours"
+            rel = f"{days} days ago"
         elif days < 365:
             months = max(1, days // 30)
-            rel = f"il y a {months} mois"
+            rel = f"{months} month{'s' if months > 1 else ''} ago"
         else:
             years = days // 365
-            rel = f"il y a {years} an{'s' if years > 1 else ''}"
+            rel = f"{years} year{'s' if years > 1 else ''} ago"
 
         return f"{date_str} ({rel})"
     except Exception:
@@ -128,7 +128,7 @@ def scrape_trending(language, since="daily"):
                 continue
             repo_name = repo_m.group(1).strip()
             delta_m = re.search(r'([\d,]+)\s+stars\s+(today|this week|this month)', art)
-            trending_delta = f"+{delta_m.group(1)} stars {delta_m.group(2)}" if delta_m else "Présent dans les tendances"
+            trending_delta = f"+{delta_m.group(1)} stars {delta_m.group(2)}" if delta_m else "Trending"
             results.append({
                 'repo': repo_name,
                 'trending_delta': trending_delta
@@ -199,7 +199,7 @@ def find_official_manifests(package_names):
             with urllib.request.urlopen(request, timeout=20) as response:
                 data = json.loads(response.read().decode('utf-8'))
         except Exception as e:
-            raise RuntimeError(f"Impossible d'interroger l'index officiel Scoop: {e}") from e
+            raise RuntimeError(f"Could not query the official Scoop index: {e}") from e
 
         # Full-text matching can return token/substring matches; only exact manifest names count.
         for item in data.get('value', []):
@@ -208,7 +208,7 @@ def find_official_manifests(package_names):
                 continue
             repository = item.get('Metadata', {}).get('Repository')
             if not repository:
-                raise RuntimeError(f"Le manifeste officiel « {name} » ne contient pas son dépôt dans l'index Scoop")
+                raise RuntimeError(f"Official manifest '{name}' has no repository listed in the Scoop index")
             matches.setdefault(name, set()).add(repository.rstrip('/'))
 
     return matches
@@ -242,7 +242,7 @@ def check_english_support(repo_full_name, desc):
     cjk_chars = re.findall(r'[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]', desc)
     # If description has no non-Latin CJK characters, it's considered English
     if not cjk_chars:
-        return True, "Description en anglais"
+        return True, "Description is in English"
 
     # If description has CJK, check for explicit English README variants
     variants = [
@@ -257,7 +257,7 @@ def check_english_support(repo_full_name, desc):
                 req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
                 resp = urllib.request.urlopen(req, timeout=3)
                 if resp.status == 200:
-                    return True, f"Variante README en anglais trouvée ({v})"
+                    return True, f"English README variant found ({v})"
             except Exception:
                 continue
 
@@ -271,16 +271,16 @@ def check_english_support(repo_full_name, desc):
                 content = resp.read().decode('utf-8', errors='ignore')[:1500]
                 # Look for English version links
                 if re.search(r'\b(English|English documentation|English README|Translation)\b', content, re.I):
-                    return True, "README propose une version ou documentation en anglais"
+                    return True, "README links to an English version or documentation"
                 # Check ratio of Latin words to CJK in header of README
                 latin_words = len(re.findall(r'[a-zA-Z]{3,}', content[:500]))
                 cjk_in_readme = len(re.findall(r'[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]', content[:500]))
                 if latin_words > 20 and latin_words > cjk_in_readme:
-                    return True, "README principal rédigé en anglais"
+                    return True, "Main README appears to be in English"
         except Exception:
             continue
 
-    return False, "Projet non anglophone sans variante/documentation en anglais (critère Scoop officiel non respecté)"
+    return False, "Project has no English interface or documentation (does not meet official Scoop criteria)"
 
 def evaluate_trending_repo(repo_full_name, trending_delta, token=None):
     """
@@ -294,19 +294,19 @@ def evaluate_trending_repo(repo_full_name, trending_delta, token=None):
         rel, total_releases = get_latest_release(repo_full_name, token)
     except urllib.error.HTTPError as e:
         if e.code == 404:
-            return None, "Aucune release GitHub publiée"
+            return None, "No GitHub release found"
         if e.code == 403:
             warn_github_rate_limit()
-            return None, "Quota API GitHub dépassé (token facultatif)"
-        return None, f"Erreur HTTP release {e.code}"
+            return None, "GitHub API quota exceeded (token is optional)"
+        return None, f"Release HTTP error {e.code}"
     except Exception as e:
-        return None, f"Erreur release: {e}"
+        return None, f"Release error: {e}"
 
     if rel is None:
-        return None, "Aucune release GitHub publiée"
+        return None, "No GitHub release found"
 
     if rel.get('prerelease', False):
-        return None, "Dernière release marquée comme pré-version (prerelease)"
+        return None, "Latest release is marked as a prerelease"
 
     tag = rel.get('tag_name', '')
     published_at = rel.get('published_at', '')
@@ -327,7 +327,7 @@ def evaluate_trending_repo(repo_full_name, trending_delta, token=None):
             })
 
     if not win_assets:
-        return None, f"Aucun binaire Windows dans la release ({len(assets)} assets)"
+        return None, f"No Windows binary in release ({len(assets)} assets)"
 
     # Metadata & topic inspection
     api_url = f"https://api.github.com/repos/{repo_full_name}"
@@ -336,20 +336,20 @@ def evaluate_trending_repo(repo_full_name, trending_delta, token=None):
     except urllib.error.HTTPError as e:
         if e.code == 403:
             warn_github_rate_limit()
-        return None, f"Erreur métadonnées: {e}"
+        return None, f"Metadata error: {e}"
     except Exception as e:
-        return None, f"Erreur métadonnées: {e}"
+        return None, f"Metadata error: {e}"
 
     if info.get('archived') or info.get('disabled'):
-        return None, "Dépôt archivé ou désactivé"
+        return None, "Repository is archived or disabled"
 
     topics = [t.lower() for t in info.get('topics', [])]
     if any(t in EXCLUDED_TOPICS for t in topics):
-        return None, f"Topic exclu : {set(topics) & EXCLUDED_TOPICS}"
+        return None, f"Excluded topic: {set(topics) & EXCLUDED_TOPICS}"
 
     desc = (info.get('description') or '').strip()
     if re.search(r'\b(library|framework|sdk|crate for|bindings for|collection of|curated list|cheat-sheet)\b', desc, re.I):
-        return None, "La description indique une bibliothèque/framework/liste"
+        return None, "Description indicates a library, framework, or list"
 
     # Language check (conforming to official Scoop criteria: English interface or at least English docs)
     is_en, en_reason = check_english_support(repo_full_name, desc)
@@ -391,7 +391,7 @@ def evaluate_trending_repo(repo_full_name, trending_delta, token=None):
         'published_at': published_at,
         'total_releases': total_releases,
         'trending_delta': trending_delta,
-        'license': (info.get('license') or {}).get('spdx_id', 'Non spécifiée'),
+        'license': (info.get('license') or {}).get('spdx_id', 'Not specified'),
         'type': app_type,
         'win_assets': win_assets
     }, "OK"
@@ -413,7 +413,7 @@ def get_existing_issues():
                 if m_title:
                     seen_names.add(m_title.group(1).lower())
     except Exception as e:
-        print_alert(f"Warning: could not check existing issues: {e}")
+        print_alert(f"Could not check existing issues: {e}")
 
     return seen_repos, seen_names
 
@@ -422,7 +422,7 @@ def create_candidate_issue(candidate, lang):
     name = candidate['name']
     app_type = candidate['type']
     version = candidate['version']
-    desc = candidate['description'] or "Aucune description fournie."
+    desc = candidate['description'] or "No description provided."
     homepage = candidate['homepage']
     stars = candidate['stars']
     forks = candidate['forks']
@@ -439,47 +439,47 @@ def create_candidate_issue(candidate, lang):
     title = f"[Candidate]: {name} ({app_type}) - {desc[:60].strip()}"
 
     body_lines = [
-        f"### :package: Candidat : `{name}` ({app_type})",
+        f"### :package: Candidate: `{name}` ({app_type})",
         "",
-        f"Détecté dans les **GitHub Trending ({lang.upper()})**.",
+        f"Found on **GitHub Trending ({lang.upper()})**.",
         "",
-        "#### :bar_chart: Métadonnées & Popularité",
-        f"- **Dépôt** : https://github.com/{repo}",
+        "#### :bar_chart: Metadata & popularity",
+        f"- **Repository**: https://github.com/{repo}",
     ]
     if homepage and homepage != f"https://github.com/{repo}":
-        body_lines.append(f"- **Site officiel** : {homepage}")
+        body_lines.append(f"- **Official website**: {homepage}")
 
     body_lines.extend([
-        f"- **Trending au repérage** : :fire: `{trending_delta}`",
-        f"- **Étoiles** : :star: **{stars:,}**",
-        f"- **Forks** : :fork_and_knife: **{forks:,}**",
-        f"- **Issues ouvertes** : :warning: **{open_issues:,}**",
-        f"- **Releases** : :label: **{total_releases}** releases publiées",
-        f"- **Dernière release** : `{candidate['tag']}` (`{version}`) publiée le **{published_str}**",
-        f"- **Ancienneté du projet** : Créé le **{created_str}** *(dernière activité git : {pushed_str})*",
-        f"- **Licence** : `{license_id}`",
+        f"- **Trending when detected**: :fire: `{trending_delta}`",
+        f"- **Stars**: :star: **{stars:,}**",
+        f"- **Forks**: :fork_and_knife: **{forks:,}**",
+        f"- **Open issues**: :warning: **{open_issues:,}**",
+        f"- **Releases**: :label: **{total_releases}** published releases",
+        f"- **Latest release**: `{candidate['tag']}` (`{version}`), published **{published_str}**",
+        f"- **Project age**: Created **{created_str}** *(last git activity: {pushed_str})*",
+        f"- **License**: `{license_id}`",
         "",
         "#### :memo: Description",
         f"> {desc}",
         "",
-        "#### :floppy_disk: Binaires Windows détectés",
+        "#### :floppy_disk: Detected Windows binaries",
     ])
 
     for a in candidate['win_assets'][:6]:
-        size_mb = f"{a['size'] / (1024 * 1024):.1f} MB" if a['size'] else "taille non spécifiée"
+        size_mb = f"{a['size'] / (1024 * 1024):.1f} MB" if a['size'] else "size not specified"
         body_lines.append(f"- [`{a['name']}`]({a['url']}) ({size_mb})")
 
     body_lines.extend([
         "",
         "---",
         "",
-        "### :robot: Ajouter avec votre Agent local",
-        "Pour tester et ajouter ce paquet dans votre bucket Scoop local :",
+        "### :robot: Add with your local agent",
+        "To test and add this package to your local Scoop bucket:",
         "```text",
         f"Add {target_url} to my scoop bucket",
         "```",
         "",
-        "*Ticket automatisé ouvert par le workflow quotidien `.github/workflows/trending-review.yml`.*"
+        "*Automated issue opened by the daily `.github/workflows/trending-review.yml` workflow.*"
     ])
 
     body = "\n".join(body_lines)
@@ -502,27 +502,27 @@ def create_candidate_issue(candidate, lang):
         return None
 
 def main():
-    parser = argparse.ArgumentParser(description="Revue des GitHub Trending pour Scoop Bucket ns0m")
-    parser.add_argument("--languages", default=os.getenv("TRENDING_LANGUAGES", DEFAULT_LANGUAGES), help="Langages séparés par virgule")
-    parser.add_argument("--since", default=os.getenv("TRENDING_SINCE", "daily"), help="Période trending: daily, weekly, monthly")
-    parser.add_argument("--max-issues", type=int, default=int(os.getenv("MAX_ISSUES", "5")), help="Nombre max d'issues à ouvrir par exécution")
-    parser.add_argument("--local", action="store_true", help="Mode local : affiche les résultats en console sans créer d'issue GitHub")
-    parser.add_argument("--output", help="Chemin optionnel pour écrire le rapport markdown")
+    parser = argparse.ArgumentParser(description="Review GitHub Trending for the ns0m Scoop bucket")
+    parser.add_argument("--languages", default=os.getenv("TRENDING_LANGUAGES", DEFAULT_LANGUAGES), help="Comma-separated languages")
+    parser.add_argument("--since", default=os.getenv("TRENDING_SINCE", "daily"), help="Trending period: daily, weekly, or monthly")
+    parser.add_argument("--max-issues", type=int, default=int(os.getenv("MAX_ISSUES", "5")), help="Maximum number of issues to open per run")
+    parser.add_argument("--local", action="store_true", help="Local mode: print results without creating GitHub issues")
+    parser.add_argument("--output", help="Optional path for the Markdown report")
     args = parser.parse_args()
 
     languages = [l.strip() for l in args.languages.split(",") if l.strip()]
     print(f"=== Revue Trending Scoop ===")
-    print(f"Langages ciblés : {languages} (Période : {args.since})")
+    print(f"Languages: {languages} (period: {args.since})")
 
-    # ÉTAPE 1 : Filtrer localement et dans les buckets officiels avant l'analyse détaillée.
-    print("\n[1/2] Analyse des GitHub Trending...")
+    # Step 1: filter local and official bucket manifests before detailed analysis.
+    print("\n[1/2] Reviewing GitHub Trending...")
     local_pkgs, local_repos = get_local_manifests("bucket")
 
     final_candidates = []
     seen_repos = set()
 
     for lang in languages:
-        print(f"\n      {lang} — scraping des tendances...")
+        print(f"\n      {lang} — scraping trending repositories...")
         trending_items = scrape_trending(lang, args.since)
         pending_candidates = []
         for item in trending_items:
@@ -543,10 +543,10 @@ def main():
             if repo_name.lower() in local_repos or local_matches:
                 if local_matches:
                     manifest = sorted(local_matches)[0]
-                    reason = f"manifeste local « {manifest} »"
+                    reason = f"local manifest '{manifest}'"
                 else:
-                    reason = "dépôt déjà référencé"
-                print(f"      écarté · bucket ns0m | {repo_name} | {reason}")
+                    reason = "repository already referenced"
+                print(f"      skipped · ns0m bucket | {repo_name} | {reason}")
                 continue
 
             pending_candidates.append({
@@ -557,15 +557,15 @@ def main():
             })
 
         if not pending_candidates:
-            print(f"      {lang} — aucun dépôt à vérifier après le filtre local.")
+            print(f"      {lang} — no repositories left after the local filter.")
             continue
 
-        print(f"      {lang} — vérification des buckets et qualification...")
+        print(f"      {lang} — checking buckets and qualifying candidates...")
         try:
             all_package_names = set().union(*(item['package_names'] for item in pending_candidates))
             official_pkgs = find_official_manifests(all_package_names)
         except RuntimeError as e:
-            print_alert(f"Vérification des buckets Scoop impossible : {e}")
+            print_alert(f"Could not verify Scoop buckets: {e}")
             return 1
 
         for item in pending_candidates:
@@ -580,34 +580,34 @@ def main():
                     repository.rstrip('/').rsplit('/', 1)[-1].removesuffix('.git')
                     for repository in official_pkgs[matched_name]
                 })
-                print(f"      écarté · bucket officiel {', '.join(bucket_names)} | {repo_name} | manifeste « {matched_name} »")
+                print(f"      skipped · official bucket {', '.join(bucket_names)} | {repo_name} | manifest '{matched_name}'")
                 continue
 
             data, _ = evaluate_trending_repo(repo_name, item['trending_delta'])
             if data:
                 data['language'] = lang
                 final_candidates.append(data)
-                print(f"      retenu · {repo_name} | {data['type']} | v{data['version']} | {item['trending_delta']}")
+                print(f"      kept · {repo_name} | {data['type']} | v{data['version']} | {item['trending_delta']}")
 
-    print(f"\n[résumé] Candidats qualifiés : {len(final_candidates)}")
+    print(f"\n[summary] Qualified candidates: {len(final_candidates)}")
 
-    # ÉTAPE 2 : Traitement des candidats (création d'issues ou affichage local)
-    print("\n[2/2] Traitement des candidats...")
+    # Step 2: process candidates (create issues or display locally).
+    print("\n[2/2] Processing candidates...")
     if not args.local and os.getenv("GITHUB_ACTIONS"):
         seen_issue_repos, seen_issue_names = get_existing_issues()
-        print(f"      Issues existantes analysées : {len(seen_issue_repos)} dépôts déjà enregistrés.")
+        print(f"      Existing issues checked: {len(seen_issue_repos)} repositories already tracked.")
 
         issues_created = 0
         for c in final_candidates:
             if issues_created >= args.max_issues:
-                print_alert(f"Limite max d'issues atteinte ({args.max_issues}). Les suivants seront traités lors des prochaines sessions.")
+                print_alert(f"Maximum issue limit reached ({args.max_issues}). Remaining candidates will be processed in a future run.")
                 break
 
             repo_lower = c['repo'].lower()
             name_lower = c['name'].lower()
 
             if repo_lower in seen_issue_repos or name_lower in seen_issue_names:
-                print(f"      [écarté] issue déjà existante | {c['repo']}")
+                print(f"      skipped · issue already exists | {c['repo']}")
                 continue
 
             issue_url = create_candidate_issue(c, c['language'])
@@ -615,10 +615,10 @@ def main():
                 issues_created += 1
                 seen_issue_repos.add(repo_lower)
                 seen_issue_names.add(name_lower)
-        print(f"[+] Terminé. {issues_created} nouvelle(s) issue(s) créée(s).")
+        print(f"[+] Done. Created {issues_created} new issue(s).")
     else:
         # Sortie locale
-        print("\n=== Synthèse des Candidats Qualifiés (Mode Local) ===\n")
+        print("\n=== Qualified candidates (local mode) ===\n")
         lines = []
         for c in final_candidates:
             target_url = c['homepage'] if c['homepage'] and "github.com/" not in c['homepage'] else f"https://github.com/{c['repo']}"
@@ -627,7 +627,7 @@ def main():
             line = (
                 f"- [{c['name']}] ({c['type']}, {c['language']}) - {c['repo']} (v{c['version']})\n"
                 f"  Trending: {c['trending_delta']} | Stars: {c['stars']:,} | Forks: {c['forks']:,}\n"
-                f"  Releases: {c['total_releases']} (dernière: {published_str}) | Créé: {created_str}\n"
+                f"  Releases: {c['total_releases']} (latest: {published_str}) | Created: {created_str}\n"
                 f"  Description: {c['description']}\n"
                 f"  Homepage: {target_url}\n"
             )
@@ -636,7 +636,7 @@ def main():
 
         if args.output:
             Path(args.output).write_text("\n".join(lines), encoding="utf-8")
-            print(f"[+] Synthèse écrite dans {args.output}")
+            print(f"[+] Report written to {args.output}")
 
     return 0
 
