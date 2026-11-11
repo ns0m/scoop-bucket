@@ -166,16 +166,24 @@ def get_local_manifests(bucket_dir="bucket"):
             pass
     return local_pkgs, local_repos
 
+def normalize_package_name(name):
+    return re.sub(r'[^a-z0-9]', '', name.lower())
+
 def find_official_manifests(package_names):
-    packages = {
-        re.sub(r'[^a-z0-9_-]', '', name.lower())
+    normalized_packages = {
+        normalize_package_name(name)
         for name in package_names
     } - {''}
     matches = {}
-    package_names = sorted(packages)
+    search_names = {
+        re.sub(r'[^a-z0-9_-]', '', name.lower())
+        for name in package_names
+    } | normalized_packages
+    search_names.discard('')
+    search_names = sorted(search_names)
 
-    for offset in range(0, len(package_names), SCOOP_SEARCH_BATCH_SIZE):
-        batch = package_names[offset:offset + SCOOP_SEARCH_BATCH_SIZE]
+    for offset in range(0, len(search_names), SCOOP_SEARCH_BATCH_SIZE):
+        batch = search_names[offset:offset + SCOOP_SEARCH_BATCH_SIZE]
         name_filter = " or ".join(
             f"search.ismatch('{name}', 'Name', 'full', 'all')"
             for name in batch
@@ -202,10 +210,10 @@ def find_official_manifests(package_names):
         except Exception as e:
             raise RuntimeError(f"Could not query the official Scoop index: {e}") from e
 
-        # Full-text matching can return token/substring matches; only exact manifest names count.
+        # Full-text matching can return token/substring matches; only equal normalized names count.
         for item in data.get('value', []):
-            name = re.sub(r'[^a-z0-9_-]', '', item.get('Name', '').lower())
-            if name not in batch:
+            name = normalize_package_name(item.get('Name', ''))
+            if name not in normalized_packages:
                 continue
             repository = item.get('Metadata', {}).get('Repository')
             if not repository:
@@ -573,7 +581,7 @@ def main():
         for item in pending_candidates:
             repo_name = item['repo']
             matched_names = {
-                re.sub(r'[^a-z0-9_-]', '', name.lower())
+                normalize_package_name(name)
                 for name in item['package_names']
             } & official_pkgs.keys()
             if matched_names:
