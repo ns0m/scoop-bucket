@@ -2,8 +2,8 @@ name: Trending Review
 
 on:
   schedule:
-    # Daily at 06:00 UTC
-    - cron: '0 6 * * *'
+    # Weekly on Wednesday at 06:00 UTC
+    - cron: '0 6 * * 3'
   workflow_dispatch:
     inputs:
       languages:
@@ -13,7 +13,7 @@ on:
       since:
         description: 'Trending period (daily, weekly, monthly)'
         required: false
-        default: 'daily'
+        default: 'weekly'
       max_issues:
         description: 'Max new candidate issues to create per run'
         required: false
@@ -41,7 +41,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TRENDING_LANGUAGES: ${{ github.event.inputs.languages || 'rust,go,zig,c,c++,c#' }}
-          TRENDING_SINCE: ${{ github.event.inputs.since || 'daily' }}
+          TRENDING_SINCE: ${{ github.event.inputs.since || 'weekly' }}
           MAX_ISSUES: ${{ github.event.inputs.max_issues || '5' }}
           PYTHONDONTWRITEBYTECODE: '1'
         run: |

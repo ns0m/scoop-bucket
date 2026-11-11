@@ -116,7 +116,7 @@ def format_relative_date(iso_str):
     except Exception:
         return iso_str[:10]
 
-def scrape_trending(language, since="daily"):
+def scrape_trending(language, since="weekly"):
     slug = encode_lang_slug(language)
     url = f"https://github.com/trending/{slug}?since={since}"
     try:
@@ -514,7 +514,7 @@ def create_candidate_issue(candidate, lang):
 def main():
     parser = argparse.ArgumentParser(description="Review GitHub Trending for the ns0m Scoop bucket")
     parser.add_argument("--languages", default=os.getenv("TRENDING_LANGUAGES", DEFAULT_LANGUAGES), help="Comma-separated languages")
-    parser.add_argument("--since", default=os.getenv("TRENDING_SINCE", "daily"), help="Trending period: daily, weekly, or monthly")
+    parser.add_argument("--since", default=os.getenv("TRENDING_SINCE", "weekly"), help="Trending period: daily, weekly, or monthly")
     parser.add_argument("--max-issues", type=int, default=int(os.getenv("MAX_ISSUES", "5")), help="Maximum number of issues to open per run")
     parser.add_argument("--local", action="store_true", help="Local mode: print results without creating GitHub issues")
     parser.add_argument("--output", help="Optional path for the Markdown report")
