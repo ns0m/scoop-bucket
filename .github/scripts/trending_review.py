@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Trending Review Agent for ns0m Scoop bucket.
+Trending Review for ns0m Scoop bucket.
 Reviews GitHub Trending repositories for systems/app languages (Rust, Go, Zig, C, C++, C#).
 Order of operations:
 1. Scrape trending and apply fast local/technical filters (local bucket, releases, Windows binaries, libraries).
@@ -21,6 +21,7 @@ import argparse
 import datetime
 import urllib.request
 import urllib.error
+from urllib.parse import urlsplit
 from pathlib import Path
 
 DEFAULT_LANGUAGES = "rust,go,zig,c,c++,c#"
@@ -417,70 +418,71 @@ def get_existing_issues():
 
     return seen_repos, seen_names
 
-def create_candidate_issue(candidate, lang):
+def get_candidate_metadata(candidate):
     repo = candidate['repo']
+    homepage = candidate.get('homepage')
+    homepage_parts = urlsplit(homepage) if homepage else None
+    metadata = {
+        "Repository": f"https://github.com/{repo}",
+        "Trending when detected": candidate['trending_delta'],
+        "Stars": f"{candidate['stars']:,}",
+        "Forks": f"{candidate['forks']:,}",
+        "Open issues": f"{candidate['open_issues']:,}",
+        "Releases": candidate['total_releases'],
+        "Latest release": f"{candidate['tag']} ({candidate['version']})",
+        "Published": format_relative_date(candidate['published_at']),
+        "Created": format_relative_date(candidate['created_at']),
+        "Last git activity": format_relative_date(candidate['pushed_at']),
+        "License": candidate['license'],
+    }
+    if homepage and not (
+        homepage_parts.hostname
+        and homepage_parts.hostname.lower() in {'github.com', 'www.github.com'}
+        and homepage_parts.path.strip('/').lower() == repo.lower()
+    ):
+        metadata["Official website"] = homepage
+    return metadata
+
+def format_candidate_metadata(candidate):
+    m = get_candidate_metadata(candidate)
+    lines = [f"- **Repository**: {m['Repository']}"]
+    if "Official website" in m:
+        lines.append(f"- **Official website**: {m['Official website']}")
+    lines.extend([
+        f"- **Trending when detected**: :fire: `{m['Trending when detected']}`",
+        f"- **Stars**: :star: **{m['Stars']}**",
+        f"- **Forks**: :fork_and_knife: **{m['Forks']}**",
+        f"- **Open issues**: :warning: **{m['Open issues']}**",
+        f"- **Releases**: :label: **{m['Releases']}** published releases",
+        f"- **Latest release**: `{m['Latest release']}`, published **{m['Published']}**",
+        f"- **Project age**: Created **{m['Created']}** *(last git activity: {m['Last git activity']})*",
+        f"- **License**: `{m['License']}`",
+    ])
+    return lines
+
+def create_candidate_issue(candidate, lang):
     name = candidate['name']
     app_type = candidate['type']
-    version = candidate['version']
     desc = candidate['description'] or "No description provided."
-    homepage = candidate['homepage']
-    stars = candidate['stars']
-    forks = candidate['forks']
-    open_issues = candidate['open_issues']
-    license_id = candidate['license']
-    trending_delta = candidate['trending_delta']
-    total_releases = candidate['total_releases']
-
-    created_str = format_relative_date(candidate['created_at'])
-    pushed_str = format_relative_date(candidate['pushed_at'])
-    published_str = format_relative_date(candidate['published_at'])
-
-    target_url = homepage if homepage and "github.com/" not in homepage else f"https://github.com/{repo}"
     title = f"[Candidate]: {name} ({app_type}) - {desc[:60].strip()}"
 
     body_lines = [
         f"### :package: Candidate: `{name}` ({app_type})",
         "",
+        f"> {desc}",
+        "",
         f"Found on **GitHub Trending ({lang.upper()})**.",
         "",
         "#### :bar_chart: Metadata & popularity",
-        f"- **Repository**: https://github.com/{repo}",
     ]
-    if homepage and homepage != f"https://github.com/{repo}":
-        body_lines.append(f"- **Official website**: {homepage}")
-
+    body_lines.extend(format_candidate_metadata(candidate))
     body_lines.extend([
-        f"- **Trending when detected**: :fire: `{trending_delta}`",
-        f"- **Stars**: :star: **{stars:,}**",
-        f"- **Forks**: :fork_and_knife: **{forks:,}**",
-        f"- **Open issues**: :warning: **{open_issues:,}**",
-        f"- **Releases**: :label: **{total_releases}** published releases",
-        f"- **Latest release**: `{candidate['tag']}` (`{version}`), published **{published_str}**",
-        f"- **Project age**: Created **{created_str}** *(last git activity: {pushed_str})*",
-        f"- **License**: `{license_id}`",
-        "",
-        "#### :memo: Description",
-        f"> {desc}",
         "",
         "#### :floppy_disk: Detected Windows binaries",
     ])
-
-    for a in candidate['win_assets'][:6]:
-        size_mb = f"{a['size'] / (1024 * 1024):.1f} MB" if a['size'] else "size not specified"
-        body_lines.append(f"- [`{a['name']}`]({a['url']}) ({size_mb})")
-
-    body_lines.extend([
-        "",
-        "---",
-        "",
-        "### :robot: Add with your local agent",
-        "To test and add this package to your local Scoop bucket:",
-        "```text",
-        f"Add {target_url} to my scoop bucket",
-        "```",
-        "",
-        "*Automated issue opened by the daily `.github/workflows/trending-review.yml` workflow.*"
-    ])
+    for asset in candidate['win_assets'][:6]:
+        size_mb = f"{asset['size'] / (1024 * 1024):.1f} MB" if asset['size'] else "size not specified"
+        body_lines.append(f"- [`{asset['name']}`]({asset['url']}) ({size_mb})")
 
     body = "\n".join(body_lines)
 
@@ -621,18 +623,25 @@ def main():
         print("\n=== Qualified candidates (local mode) ===\n")
         lines = []
         for c in final_candidates:
-            target_url = c['homepage'] if c['homepage'] and "github.com/" not in c['homepage'] else f"https://github.com/{c['repo']}"
-            created_str = format_relative_date(c['created_at'])
-            published_str = format_relative_date(c['published_at'])
-            line = (
-                f"- [{c['name']}] ({c['type']}, {c['language']}) - {c['repo']} (v{c['version']})\n"
-                f"  Trending: {c['trending_delta']} | Stars: {c['stars']:,} | Forks: {c['forks']:,}\n"
-                f"  Releases: {c['total_releases']} (latest: {published_str}) | Created: {created_str}\n"
-                f"  Description: {c['description']}\n"
-                f"  Homepage: {target_url}\n"
-            )
-            lines.append(line)
-            print(line)
+            metadata = dict(get_candidate_metadata(c))
+            desc = c['description'] or "No description provided."
+            report_lines = [
+                f"- [{c['name']}] ({c['type']}, {c['language']}) - "
+                f"[{c['repo']}]({metadata['Repository']}) (v{c['version']})",
+                f"  > {desc}",
+            ]
+            if "Official website" in metadata:
+                report_lines.append(f"  Official website: {metadata['Official website']}")
+            report_lines.extend([
+                f"  Trending: {metadata['Trending when detected']} | "
+                f"Stars: {metadata['Stars']} | Forks: {metadata['Forks']}",
+                f"  Releases: {metadata['Releases']} | Latest release: {metadata['Latest release']}, "
+                f"published {metadata['Published']} | Created: {metadata['Created']}",
+                "",
+            ])
+            report = "\n".join(report_lines)
+            lines.append(report)
+            print(report)
 
         if args.output:
             Path(args.output).write_text("\n".join(lines), encoding="utf-8")
