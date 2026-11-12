@@ -3,8 +3,8 @@
 Trending Review for ns0m Scoop bucket.
 Reviews GitHub Trending repositories for systems/app languages (Rust, Go, Zig, C, C++, C#).
 Order of operations:
-1. Scrape trending and apply fast local/technical filters (local bucket, releases, Windows binaries, libraries).
-2. For surviving candidates, verify and filter out those already in official Scoop buckets.
+1. Scrape trending, load local manifest signals, and check official index/manifests for possible overlaps.
+2. Qualify candidates; suppress only strong duplicate evidence and retain weaker matches as review hints.
 3. Create dedicated GitHub Issues per newly qualified candidate (or display locally).
 """
 
@@ -14,15 +14,16 @@ import sys
 # Prevent Python from writing .pyc files or __pycache__ folders
 sys.dont_write_bytecode = True
 
-import re
-import json
-import subprocess
 import argparse
 import datetime
-import urllib.request
+import json
+import re
+import subprocess
+import unittest
 import urllib.error
-from urllib.parse import urlsplit
+import urllib.request
 from pathlib import Path
+from urllib.parse import quote, urlsplit
 
 DEFAULT_LANGUAGES = "rust,go,zig,c,c++,c#"
 SCOOP_SEARCH_URL = "https://scoopsearch.search.windows.net/indexes/apps/docs/search?api-version=2020-06-30"
@@ -91,8 +92,9 @@ def format_relative_date(iso_str):
     if not iso_str:
         return "Not specified"
     try:
-        dt = datetime.datetime.fromisoformat(iso_str.replace('Z', '+00:00'))
-        now = datetime.datetime.now(datetime.timezone.utc)
+        normalized_date = iso_str[:-1] + '+00:00' if iso_str.endswith('Z') else iso_str
+        dt = datetime.datetime.fromisoformat(normalized_date)
+        now = datetime.datetime.now(datetime.UTC)
         diff = now - dt
         days = diff.days
         date_str = dt.strftime("%Y-%m-%d")
@@ -113,7 +115,7 @@ def format_relative_date(iso_str):
             rel = f"{years} year{'s' if years > 1 else ''} ago"
 
         return f"{date_str} ({rel})"
-    except Exception:
+    except (ValueError, TypeError, OverflowError):
         return iso_str[:10]
 
 def scrape_trending(language, since="weekly"):
@@ -135,64 +137,140 @@ def scrape_trending(language, since="weekly"):
                 'trending_delta': trending_delta
             })
         return results
-    except Exception as e:
+    except (OSError, UnicodeError, ValueError) as e:
         print_alert(f"Warning: failed to scrape trending for {language}: {e}")
         return []
 
 def get_local_manifests(bucket_dir="bucket"):
-    local_pkgs = set()
-    local_repos = set()
+    manifests = {}
     bpath = Path(bucket_dir)
     if not bpath.exists():
-        return local_pkgs, local_repos
+        return manifests
 
     for file in bpath.glob("*.json"):
-        pkg = file.stem.lower()
-        local_pkgs.add(pkg)
         try:
             with open(file, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            checkver = data.get("checkver", {})
-            if isinstance(checkver, dict):
-                gh = checkver.get("github", "")
-                m = re.search(r'github\.com/([^/]+/[^/]+)', gh)
-                if m:
-                    local_repos.add(m.group(1).lower())
-            hp = data.get("homepage", "")
-            m_hp = re.search(r'github\.com/([^/]+/[^/]+)', hp)
-            if m_hp:
-                local_repos.add(m_hp.group(1).lower())
-        except Exception:
-            pass
-    return local_pkgs, local_repos
+            manifests[file.stem.lower()] = get_manifest_signals(data)
+        except (OSError, UnicodeError, json.JSONDecodeError, TypeError, AttributeError) as e:
+            print_alert(f"Could not inspect local manifest {file}: {e}")
+    return manifests
 
 def normalize_package_name(name):
     return re.sub(r'[^a-z0-9]', '', name.lower())
 
-def find_official_manifests(package_names):
-    normalized_packages = {
-        normalize_package_name(name)
-        for name in package_names
-    } - {''}
-    matches = {}
-    search_names = {
-        re.sub(r'[^a-z0-9_-]', '', name.lower())
-        for name in package_names
-    } | normalized_packages
-    search_names.discard('')
-    search_names = sorted(search_names)
+def get_candidate_package_names(repo_full_name):
+    repo_slug = repo_full_name.rsplit('/', 1)[-1].lower()
+    return {repo_slug, normalize_package_name(repo_slug)} - {''}
 
+def normalize_github_repo(value):
+    value = (value or '').strip().rstrip('.,);]')
+    match = re.search(
+        r'(?:https?://)?(?:www\.)?github\.com/([^/\s?#]+)/([^/\s?#]+)'
+        r'|^([^/\s?#]+)/([^/\s?#]+)$',
+        value,
+        re.IGNORECASE
+    )
+    if not match:
+        return ''
+    owner, repo = match.group(1, 2) if match.group(1) else match.group(3, 4)
+    return f"{owner.lower()}/{repo.lower().removesuffix('.git')}"
+
+def get_bucket_name(repository):
+    repo = normalize_github_repo(repository)
+    if not repo:
+        return repository or "unknown"
+    return repo.rsplit('/', 1)[-1].removesuffix('.git').lower()
+
+def normalize_download_url(value):
+    value = (value or '').split('#', 1)[0].strip()
+    if not value:
+        return ''
+    parts = urlsplit(value)
+    if not parts.scheme or not parts.netloc:
+        return value.rstrip('/')
+    return parts._replace(
+        scheme=parts.scheme.lower(),
+        netloc=parts.netloc.lower()
+    ).geturl().rstrip('/')
+
+def collect_binary_names(value):
+    if isinstance(value, str):
+        candidate = value.strip().split('|', 1)[0].strip()
+        return {candidate.replace('\\', '/').rsplit('/', 1)[-1].lower()} if candidate.lower().endswith('.exe') else set()
+    if isinstance(value, (list, tuple)):
+        return set().union(*(collect_binary_names(item) for item in value))
+    if isinstance(value, dict):
+        return set().union(*(collect_binary_names(item) for item in value.values()))
+    return set()
+
+def get_manifest_signals(data):
+    checkver = data.get('checkver', {})
+    homepage = data.get('homepage', '')
+    urls = set()
+    hashes = set()
+    def collect(section):
+        if isinstance(section, dict):
+            for key, value in section.items():
+                if key == 'url':
+                    urls.update(
+                        normalize_download_url(item)
+                        for item in (value if isinstance(value, list) else [value])
+                        if isinstance(item, str) and normalize_download_url(item)
+                    )
+                elif key == 'hash':
+                    for item in value if isinstance(value, list) else [value]:
+                        match = re.search(r'\b[0-9a-f]{64}\b', item, re.IGNORECASE) if isinstance(item, str) else None
+                        if match:
+                            hashes.add(match.group(0).lower())
+                elif key != 'checkver':
+                    collect(value)
+        elif isinstance(section, list):
+            for item in section:
+                collect(item)
+
+    collect(data)
+    checkver_repo = normalize_github_repo(checkver.get('github', '')) if isinstance(checkver, dict) else ''
+    homepage_repo = normalize_github_repo(homepage)
+    return {
+        'repos': {repo for repo in (checkver_repo, homepage_repo) if repo},
+        'homepage': homepage,
+        'homepage_repo': homepage_repo,
+        'urls': urls,
+        'hashes': hashes,
+        'bins': collect_binary_names((data.get('bin'), data.get('shortcuts'))),
+    }
+
+def find_official_manifests(candidates):
+    candidate_names = set().union(*(item['package_names'] for item in candidates))
+    candidate_repos = {
+        normalize_github_repo(item['repo']) for item in candidates
+    } - {''}
+    normalized_names = {normalize_package_name(name) for name in candidate_names} - {''}
+    search_names = sorted(candidate_names | normalized_names)
+    repo_filter = " or ".join(
+        f"Homepage eq '{scheme}://{host}/{owner}/{name}{suffix}'"
+        for owner, name in (repo.split('/', 1) for repo in candidate_repos)
+        for scheme in ('https', 'http')
+        for host in ('github.com', 'www.github.com')
+        for suffix in ('', '/')
+    )
+
+    matches = {}
     for offset in range(0, len(search_names), SCOOP_SEARCH_BATCH_SIZE):
         batch = search_names[offset:offset + SCOOP_SEARCH_BATCH_SIZE]
-        name_filter = " or ".join(
-            f"search.ismatch('{name}', 'Name', 'full', 'all')"
+        filters = [
+            "search.ismatch('{}', 'Name', 'full', 'all')".format(name.replace("'", "''"))
             for name in batch
-        )
+        ]
+        if repo_filter:
+            filters.append(repo_filter)
+        match_filter = " or ".join(filters)
         payload = {
             "search": "*",
-            "filter": f"Metadata/OfficialRepositoryNumber eq 1 and ({name_filter})",
+            "filter": f"Metadata/OfficialRepositoryNumber eq 1 and ({match_filter})",
             "top": 1000,
-            "select": "Name,Metadata/Repository"
+            "select": "Name,Homepage,Metadata/Repository,Metadata/BranchName,Metadata/FilePath"
         }
         request = urllib.request.Request(
             SCOOP_SEARCH_URL,
@@ -210,17 +288,130 @@ def find_official_manifests(package_names):
         except Exception as e:
             raise RuntimeError(f"Could not query the official Scoop index: {e}") from e
 
-        # Full-text matching can return token/substring matches; only equal normalized names count.
+        # Index matches are hints unless both the manifest name and source repository agree.
         for item in data.get('value', []):
             name = normalize_package_name(item.get('Name', ''))
-            if name not in normalized_packages:
+            homepage_repo = normalize_github_repo(item.get('Homepage', ''))
+            if name not in normalized_names and homepage_repo not in candidate_repos:
                 continue
             repository = item.get('Metadata', {}).get('Repository')
             if not repository:
                 raise RuntimeError(f"Official manifest '{name}' has no repository listed in the Scoop index")
-            matches.setdefault(name, set()).add(repository.rstrip('/'))
+            repository = repository.rstrip('/')
+            key = (item.get('Name', ''), repository, item.get('Homepage', ''))
+            if key in matches:
+                continue
+            manifest = {
+                'name': item.get('Name', ''),
+                'repository': repository,
+                'homepage': item.get('Homepage', ''),
+                'homepage_repo': homepage_repo,
+            }
+            metadata = item.get('Metadata', {})
+            try:
+                manifest['signals'] = fetch_official_manifest_signals(
+                    repository,
+                    metadata.get('BranchName', ''),
+                    metadata.get('FilePath', '')
+                )
+            except (OSError, UnicodeError, ValueError, TypeError, AttributeError) as e:
+                manifest['signal_error'] = str(e)
+                print_alert(
+                    f"Could not inspect official manifest '{manifest['name']}' "
+                    f"from {manifest['repository']}: {e}"
+                )
+            matches[key] = manifest
 
-    return matches
+    return list(matches.values())
+
+def fetch_official_manifest_signals(repository, branch, file_path):
+    repo = normalize_github_repo(repository)
+    if not repo or not branch or not file_path:
+        raise ValueError("the Scoop index did not provide a GitHub repository, branch, and manifest path")
+    raw_url = (
+        f"https://raw.githubusercontent.com/{repo}/"
+        f"{quote(branch, safe='')}/{quote(file_path, safe='/')}"
+    )
+    request = urllib.request.Request(
+        raw_url,
+        headers={'User-Agent': 'ns0m-ScoopTrendingReview/2.0'}
+    )
+    with urllib.request.urlopen(request, timeout=10) as response:
+        data = json.loads(response.read().decode('utf-8'))
+    if not isinstance(data, dict):
+        raise TypeError("manifest content is not a JSON object")
+    return get_manifest_signals(data)
+
+def find_manifest_duplicate_evidence(candidate, manifests):
+    repo = normalize_github_repo(candidate['repo'])
+    homepage = candidate.get('homepage', '')
+    asset_urls = {
+        normalize_download_url(asset.get('url', ''))
+        for asset in candidate.get('win_assets', [])
+    } - {''}
+    asset_hashes = set()
+    asset_names = set()
+    for asset in candidate.get('win_assets', []):
+        digest = re.search(r'\b[0-9a-f]{64}\b', asset.get('digest') or '', re.IGNORECASE)
+        if digest:
+            asset_hashes.add(digest.group(0).lower())
+        asset_names.add((asset.get('name') or '').replace('\\', '/').rsplit('/', 1)[-1].lower())
+
+    evidence = {}
+    candidate_names = {
+        normalize_package_name(name)
+        for name in candidate.get('package_names', {candidate['name']})
+    }
+    for name, signals in manifests.items():
+        reasons = set()
+        if repo and repo in signals['repos']:
+            reasons.add('repository')
+        if homepage and normalize_download_url(homepage) == normalize_download_url(signals['homepage']):
+            reasons.add('homepage')
+        if asset_urls & signals['urls']:
+            reasons.add('download URL')
+        if asset_hashes & signals['hashes']:
+            reasons.add('SHA-256')
+        if asset_names & signals['bins']:
+            reasons.add('binary name')
+        if normalize_package_name(name) in candidate_names:
+            reasons.add('manifest name')
+        if reasons:
+            evidence[name] = reasons
+    return evidence
+
+def find_official_duplicate_evidence(candidate, manifests):
+    repo = normalize_github_repo(candidate['repo'])
+    candidate_names = {
+        normalize_package_name(name)
+        for name in candidate.get('package_names', {candidate['name']})
+    }
+    evidence = {}
+    for manifest in manifests:
+        reasons = set()
+        if normalize_package_name(manifest['name']) in candidate_names:
+            reasons.add('manifest name')
+        if repo and repo == manifest['homepage_repo']:
+            reasons.add('repository/homepage')
+        if manifest.get('signals'):
+            manifest_evidence = find_manifest_duplicate_evidence(
+                candidate,
+                {manifest['name']: manifest['signals']}
+            )
+            reasons.update(manifest_evidence.get(manifest['name'], set()))
+        if reasons:
+            key = (manifest['name'], manifest['repository'], manifest['homepage'])
+            evidence[key] = reasons
+    return evidence
+
+def has_strong_duplicate_evidence(evidence):
+    return any(
+        'download URL' in reasons
+        or 'SHA-256' in reasons
+        or {'repository', 'manifest name'} <= reasons
+        or {'repository/homepage', 'manifest name'} <= reasons
+        for reasons in evidence.values()
+    )
 
 def get_latest_release(repo_full_name, token=None):
     url = f"https://api.github.com/repos/{repo_full_name}/releases?per_page=1"
@@ -267,8 +458,8 @@ def check_english_support(repo_full_name, desc):
                 resp = urllib.request.urlopen(req, timeout=3)
                 if resp.status == 200:
                     return True, f"English README variant found ({v})"
-            except Exception:
-                continue
+            except (OSError, urllib.error.URLError, UnicodeError):
+                pass
 
     # Also check the default README.md
     for branch in ("main", "master"):
@@ -279,21 +470,21 @@ def check_english_support(repo_full_name, desc):
             if resp.status == 200:
                 content = resp.read().decode('utf-8', errors='ignore')[:1500]
                 # Look for English version links
-                if re.search(r'\b(English|English documentation|English README|Translation)\b', content, re.I):
+                if re.search(r'\b(English|English documentation|English README|Translation)\b', content, re.IGNORECASE):
                     return True, "README links to an English version or documentation"
                 # Check ratio of Latin words to CJK in header of README
                 latin_words = len(re.findall(r'[a-zA-Z]{3,}', content[:500]))
                 cjk_in_readme = len(re.findall(r'[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]', content[:500]))
                 if latin_words > 20 and latin_words > cjk_in_readme:
                     return True, "Main README appears to be in English"
-        except Exception:
-            continue
+        except (OSError, urllib.error.URLError, UnicodeError):
+            pass
 
     return False, "Project has no English interface or documentation (does not meet official Scoop criteria)"
 
 def evaluate_trending_repo(repo_full_name, trending_delta, token=None):
     """
-    Evaluate a repository that has already passed the local and official bucket filters.
+    Qualify a candidate and collect its available Windows release-asset signals.
     """
     owner, repo = repo_full_name.split('/')
     candidate_slug = re.sub(r'[^a-z0-9_-]', '', repo.lower())
@@ -308,7 +499,7 @@ def evaluate_trending_repo(repo_full_name, trending_delta, token=None):
             warn_github_rate_limit()
             return None, "GitHub API quota exceeded (token is optional)"
         return None, f"Release HTTP error {e.code}"
-    except Exception as e:
+    except (OSError, ValueError, TypeError) as e:
         return None, f"Release error: {e}"
 
     if rel is None:
@@ -332,7 +523,8 @@ def evaluate_trending_repo(repo_full_name, trending_delta, token=None):
             win_assets.append({
                 'name': aname,
                 'url': a.get('browser_download_url', ''),
-                'size': a.get('size', 0)
+                'size': a.get('size', 0),
+                'digest': a.get('digest', '')
             })
 
     if not win_assets:
@@ -346,7 +538,7 @@ def evaluate_trending_repo(repo_full_name, trending_delta, token=None):
         if e.code == 403:
             warn_github_rate_limit()
         return None, f"Metadata error: {e}"
-    except Exception as e:
+    except (OSError, ValueError, TypeError) as e:
         return None, f"Metadata error: {e}"
 
     if info.get('archived') or info.get('disabled'):
@@ -357,7 +549,7 @@ def evaluate_trending_repo(repo_full_name, trending_delta, token=None):
         return None, f"Excluded topic: {set(topics) & EXCLUDED_TOPICS}"
 
     desc = (info.get('description') or '').strip()
-    if re.search(r'\b(library|framework|sdk|crate for|bindings for|collection of|curated list|cheat-sheet)\b', desc, re.I):
+    if re.search(r'\b(library|framework|sdk|crate for|bindings for|collection of|curated list|cheat-sheet)\b', desc, re.IGNORECASE):
         return None, "Description indicates a library, framework, or list"
 
     # Language check (conforming to official Scoop criteria: English interface or at least English docs)
@@ -367,11 +559,7 @@ def evaluate_trending_repo(repo_full_name, trending_delta, token=None):
 
     # Classify CLI vs GUI
     is_gui = False
-    if any(a['name'].endswith('.msi') or 'setup' in a['name'].lower() for a in win_assets):
-        is_gui = True
-    elif any(k in desc.lower() for k in ('desktop', 'gui', 'electron', 'tauri', 'interface graph', 'wpf', 'winui', 'avalonia')):
-        is_gui = True
-    elif 'gui' in topics or 'desktop-app' in topics:
+    if any(a['name'].endswith('.msi') or 'setup' in a['name'].lower() for a in win_assets) or any(k in desc.lower() for k in ('desktop', 'gui', 'electron', 'tauri', 'interface graph', 'wpf', 'winui', 'avalonia')) or 'gui' in topics or 'desktop-app' in topics:
         is_gui = True
 
     app_type = "GUI" if is_gui else "CLI"
@@ -405,26 +593,51 @@ def evaluate_trending_repo(repo_full_name, trending_delta, token=None):
         'win_assets': win_assets
     }, "OK"
 
-def get_existing_issues():
+def collect_existing_issue_keys(issues):
     seen_repos = set()
     seen_names = set()
-    cmd = ["gh", "issue", "list", "--state", "all", "--limit", "300", "--json", "title,body,number"]
-    try:
-        res = subprocess.run(cmd, capture_output=True, text=True)
-        if res.returncode == 0:
-            issues = json.loads(res.stdout)
-            for iss in issues:
-                body = iss.get('body', '')
-                title = iss.get('title', '')
-                for match in re.findall(r'github\.com/([^/\s\)\"\']+/[^/\s\)\"\']+)', body + " " + title):
-                    seen_repos.add(match.lower())
-                m_title = re.search(r'\[(?:Candidate|Request)\]:\s*([a-z0-9_-]+)', title, re.I)
-                if m_title:
-                    seen_names.add(m_title.group(1).lower())
-    except Exception as e:
-        print_alert(f"Could not check existing issues: {e}")
+    seen_pairs = set()
+    for iss in issues:
+        body = iss.get('body') or ''
+        title = iss.get('title') or ''
+        issue_repos = set()
+        for match in re.findall(
+            r'github\.com/([^/\s\)\"\']+/[^/\s\)\"\']+)',
+            body + " " + title,
+            re.IGNORECASE
+        ):
+            repo = normalize_github_repo(match)
+            if repo:
+                seen_repos.add(repo)
+                issue_repos.add(repo)
+        issue_text = title + "\n" + body
+        issue_names = set()
+        for match in re.findall(
+            r'\[(?:Candidate|Request)\]:\s*([a-z0-9_-]+)|Candidate:\s*`([^`]+)`',
+            issue_text,
+            re.IGNORECASE
+        ):
+            normalized = normalize_package_name(match[0] or match[1])
+            if normalized:
+                seen_names.add(normalized)
+                issue_names.add(normalized)
+        seen_pairs.update((repo, name) for repo in issue_repos for name in issue_names)
+    return seen_repos, seen_names, seen_pairs
 
-    return seen_repos, seen_names
+def get_existing_issues():
+    cmd = ["gh", "issue", "list", "--state", "all", "--limit", "1000", "--json", "title,body,number"]
+    try:
+        res = subprocess.run(cmd, check=False, capture_output=True, text=True)
+    except OSError as e:
+        raise RuntimeError(f"Could not run gh issue list: {e}") from e
+    if res.returncode != 0:
+        raise RuntimeError(res.stderr.strip() or "gh issue list failed")
+    try:
+        issues = json.loads(res.stdout)
+    except json.JSONDecodeError as e:
+        raise RuntimeError(f"Could not parse existing issues: {e}") from e
+
+    return collect_existing_issue_keys(issues)
 
 def get_candidate_metadata(candidate):
     repo = candidate['repo']
@@ -490,20 +703,27 @@ def create_candidate_issue(candidate, lang):
     ])
     for asset in candidate['win_assets'][:6]:
         size_mb = f"{asset['size'] / (1024 * 1024):.1f} MB" if asset['size'] else "size not specified"
-        body_lines.append(f"- [`{asset['name']}`]({asset['url']}) ({size_mb})")
+        digest = f"; `{asset['digest']}`" if asset.get('digest') else ""
+        body_lines.append(f"- [`{asset['name']}`]({asset['url']}) ({size_mb}{digest})")
+    if candidate.get('duplicate_hints'):
+        body_lines.extend([
+            "",
+            "Potential overlap signals from automated input checks (investigate; these are not definitive duplicates):",
+        ])
+        body_lines.extend(f"- {hint}" for hint in candidate['duplicate_hints'])
 
     body = "\n".join(body_lines)
 
     labels = "package-request,trending-candidate"
     cmd = ["gh", "issue", "create", "--title", title, "--body", body, "--label", labels]
-    res = subprocess.run(cmd, capture_output=True, text=True)
+    res = subprocess.run(cmd, check=False, capture_output=True, text=True)
     if res.returncode == 0:
         issue_url = res.stdout.strip()
         print(f"[+] Created Issue: {issue_url}")
         return issue_url
     else:
         cmd_fallback = ["gh", "issue", "create", "--title", title, "--body", body]
-        res2 = subprocess.run(cmd_fallback, capture_output=True, text=True)
+        res2 = subprocess.run(cmd_fallback, check=False, capture_output=True, text=True)
         if res2.returncode == 0:
             issue_url = res2.stdout.strip()
             print(f"[+] Created Issue (no labels): {issue_url}")
@@ -511,25 +731,39 @@ def create_candidate_issue(candidate, lang):
         print(f"[!] Failed to create issue: {res2.stderr}", file=sys.stderr)
         return None
 
+def run_tests():
+    suite = unittest.defaultTestLoader.discover(
+        str(Path(__file__).parent),
+        pattern='test_trending_review.py'
+    )
+    result = unittest.TextTestRunner(verbosity=2).run(suite)
+    return 0 if result.wasSuccessful() else 1
+
 def main():
     parser = argparse.ArgumentParser(description="Review GitHub Trending for the ns0m Scoop bucket")
     parser.add_argument("--languages", default=os.getenv("TRENDING_LANGUAGES", DEFAULT_LANGUAGES), help="Comma-separated languages")
     parser.add_argument("--since", default=os.getenv("TRENDING_SINCE", "weekly"), help="Trending period: daily, weekly, or monthly")
     parser.add_argument("--max-issues", type=int, default=int(os.getenv("MAX_ISSUES", "5")), help="Maximum number of issues to open per run")
-    parser.add_argument("--local", action="store_true", help="Local mode: print results without creating GitHub issues")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--local", action="store_true", help="Local mode: print results without creating GitHub issues")
+    mode.add_argument("--test", action="store_true", help="Run offline duplicate-detection tests")
     parser.add_argument("--output", help="Optional path for the Markdown report")
     args = parser.parse_args()
 
+    if args.test:
+        return run_tests()
+
     languages = [l.strip() for l in args.languages.split(",") if l.strip()]
-    print(f"=== Revue Trending Scoop ===")
+    print("=== Revue Trending Scoop ===")
     print(f"Languages: {languages} (period: {args.since})")
 
-    # Step 1: filter local and official bucket manifests before detailed analysis.
+    # Step 1: gather local and official manifest signals before qualification.
     print("\n[1/2] Reviewing GitHub Trending...")
-    local_pkgs, local_repos = get_local_manifests("bucket")
+    local_manifests = get_local_manifests("bucket")
 
     final_candidates = []
     seen_repos = set()
+    seen_candidate_names = {}
 
     for lang in languages:
         print(f"\n      {lang} — scraping trending repositories...")
@@ -537,28 +771,12 @@ def main():
         pending_candidates = []
         for item in trending_items:
             repo_name = item['repo']
-            if repo_name.lower() in seen_repos:
+            normalized_repo = normalize_github_repo(repo_name)
+            if normalized_repo in seen_repos:
                 continue
-            seen_repos.add(repo_name.lower())
+            seen_repos.add(normalized_repo)
 
-            candidate_slug = re.sub(r'[^a-z0-9_-]', '', repo_name.rsplit('/', 1)[-1].lower())
-            repo_slug = repo_name.rsplit('/', 1)[-1].lower()
-            package_names = {
-                repo_slug,
-                candidate_slug,
-                repo_slug.replace('_', '-'),
-                candidate_slug.replace('_', '-')
-            }
-            local_matches = package_names & local_pkgs
-            if repo_name.lower() in local_repos or local_matches:
-                if local_matches:
-                    manifest = sorted(local_matches)[0]
-                    reason = f"local manifest '{manifest}'"
-                else:
-                    reason = "repository already referenced"
-                print(f"      skipped · ns0m bucket | {repo_name} | {reason}")
-                continue
-
+            package_names = get_candidate_package_names(repo_name)
             pending_candidates.append({
                 'repo': repo_name,
                 'language': lang,
@@ -567,44 +785,95 @@ def main():
             })
 
         if not pending_candidates:
-            print(f"      {lang} — no repositories left after the local filter.")
+            print(f"      {lang} — no repositories found.")
             continue
 
         print(f"      {lang} — checking buckets and qualifying candidates...")
         try:
-            all_package_names = set().union(*(item['package_names'] for item in pending_candidates))
-            official_pkgs = find_official_manifests(all_package_names)
+            official_manifests = find_official_manifests(pending_candidates)
         except RuntimeError as e:
             print_alert(f"Could not verify Scoop buckets: {e}")
             return 1
 
         for item in pending_candidates:
             repo_name = item['repo']
-            matched_names = {
-                normalize_package_name(name)
-                for name in item['package_names']
-            } & official_pkgs.keys()
-            if matched_names:
-                matched_name = sorted(matched_names)[0]
-                bucket_names = sorted({
-                    repository.rstrip('/').rsplit('/', 1)[-1].removesuffix('.git')
-                    for repository in official_pkgs[matched_name]
-                })
-                print(f"      skipped · official bucket {', '.join(bucket_names)} | {repo_name} | manifest '{matched_name}'")
-                continue
-
             data, _ = evaluate_trending_repo(repo_name, item['trending_delta'])
             if data:
                 data['language'] = lang
-                final_candidates.append(data)
-                print(f"      kept · {repo_name} | {data['type']} | v{data['version']} | {item['trending_delta']}")
+                data['package_names'] = item['package_names']
+                data['duplicate_hints'] = []
+                local_evidence = find_manifest_duplicate_evidence(data, local_manifests)
+                official_evidence = find_official_duplicate_evidence(data, official_manifests)
+                strong_local = {
+                    name: reasons for name, reasons in local_evidence.items()
+                    if has_strong_duplicate_evidence({name: reasons})
+                }
+                strong_official = {
+                    key: reasons for key, reasons in official_evidence.items()
+                    if has_strong_duplicate_evidence({key: reasons})
+                }
+                if strong_local or strong_official:
+                    locations = []
+                    locations.extend(
+                        f"ns0m bucket (manifest '{name}': {', '.join(sorted(reasons))})"
+                        for name, reasons in strong_local.items()
+                    )
+                    for (name, repository, _), reasons in strong_official.items():
+                        locations.append(
+                            f"{get_bucket_name(repository)} bucket "
+                            f"(manifest '{name}': {', '.join(sorted(reasons))})"
+                        )
+                    print(
+                        f"      skipped · found in {', '.join(locations)} | {repo_name}"
+                    )
+                    continue
 
-    print(f"\n[summary] Qualified candidates: {len(final_candidates)}")
+                for manifest_name, reasons in local_evidence.items():
+                    data['duplicate_hints'].append(
+                        f"Local manifest '{manifest_name}' shares: {', '.join(sorted(reasons))}."
+                    )
+                for manifest in official_manifests:
+                    key = (manifest['name'], manifest['repository'], manifest['homepage'])
+                    reasons = official_evidence.get(key)
+                    if reasons:
+                        unavailable = (
+                            f" Detailed manifest signals unavailable: {manifest['signal_error']}."
+                            if manifest.get('signal_error') else ""
+                        )
+                        data['duplicate_hints'].append(
+                            f"Official manifest '{manifest['name']}' "
+                            f"({manifest['repository']}) shares: {', '.join(sorted(reasons))}."
+                            f"{unavailable}"
+                        )
+
+                candidate_name = normalize_package_name(data['name'])
+                previous_candidates = seen_candidate_names.setdefault(candidate_name, [])
+                for previous in previous_candidates:
+                    if previous['repo'] == data['repo']:
+                        continue
+                    data['duplicate_hints'].append(
+                        f"Trending repository shares a normalized name with {previous['repo']}."
+                    )
+                    previous['duplicate_hints'].append(
+                        f"Trending repository shares a normalized name with {data['repo']}."
+                    )
+                previous_candidates.append(data)
+                final_candidates.append(data)
+                print(
+                    f"      candidate · input checks passed; duplicate review pending | "
+                    f"{repo_name} | {data['type']} | v{data['version']} | {item['trending_delta']}"
+                )
+
+    print(f"\n[summary] Candidates passing input checks (duplicate review pending): {len(final_candidates)}")
 
     # Step 2: process candidates (create issues or display locally).
     print("\n[2/2] Processing candidates...")
     if not args.local and os.getenv("GITHUB_ACTIONS"):
-        seen_issue_repos, seen_issue_names = get_existing_issues()
+        try:
+            seen_issue_repos, seen_issue_names, seen_issue_pairs = get_existing_issues()
+        except RuntimeError as e:
+            print_alert(f"Could not verify existing issues; refusing to create potentially duplicate issues: {e}")
+            return 1
         print(f"      Existing issues checked: {len(seen_issue_repos)} repositories already tracked.")
 
         issues_created = 0
@@ -613,38 +882,53 @@ def main():
                 print_alert(f"Maximum issue limit reached ({args.max_issues}). Remaining candidates will be processed in a future run.")
                 break
 
-            repo_lower = c['repo'].lower()
-            name_lower = c['name'].lower()
+            repo_key = normalize_github_repo(c['repo'])
+            name_key = normalize_package_name(c['name'])
 
-            if repo_lower in seen_issue_repos or name_lower in seen_issue_names:
+            if (repo_key, name_key) in seen_issue_pairs:
                 print(f"      skipped · issue already exists | {c['repo']}")
                 continue
+            if repo_key in seen_issue_repos:
+                c['duplicate_hints'].append("An existing issue references this repository under a different candidate name.")
+            if name_key in seen_issue_names:
+                c['duplicate_hints'].append("An existing issue uses this normalized candidate name for another or unknown repository.")
 
             issue_url = create_candidate_issue(c, c['language'])
             if issue_url:
                 issues_created += 1
-                seen_issue_repos.add(repo_lower)
-                seen_issue_names.add(name_lower)
+                seen_issue_repos.add(repo_key)
+                seen_issue_names.add(name_key)
+                seen_issue_pairs.add((repo_key, name_key))
         print(f"[+] Done. Created {issues_created} new issue(s).")
     else:
         # Sortie locale
-        print("\n=== Qualified candidates (local mode) ===\n")
+        print("\n=== Candidates passing input checks (local mode; duplicate review pending) ===\n")
         lines = []
         for c in final_candidates:
             metadata = dict(get_candidate_metadata(c))
             desc = c['description'] or "No description provided."
             report_lines = [
-                f"- [{c['name']}] ({c['type']}, {c['language']}) - "
-                f"[{c['repo']}]({metadata['Repository']}) (v{c['version']})",
+                (
+                    f"- [{c['name']}] ({c['type']}, {c['language']}) - "
+                    f"[{c['repo']}]({metadata['Repository']}) (v{c['version']})"
+                ),
                 f"  > {desc}",
             ]
             if "Official website" in metadata:
                 report_lines.append(f"  Official website: {metadata['Official website']}")
+            if c.get('duplicate_hints'):
+                report_lines.append(
+                    "  Potential duplicate signals: " + "; ".join(c['duplicate_hints'])
+                )
             report_lines.extend([
-                f"  Trending: {metadata['Trending when detected']} | "
-                f"Stars: {metadata['Stars']} | Forks: {metadata['Forks']}",
-                f"  Releases: {metadata['Releases']} | Latest release: {metadata['Latest release']}, "
-                f"published {metadata['Published']} | Created: {metadata['Created']}",
+                (
+                    f"  Trending: {metadata['Trending when detected']} | "
+                    f"Stars: {metadata['Stars']} | Forks: {metadata['Forks']}"
+                ),
+                (
+                    f"  Releases: {metadata['Releases']} | Latest release: {metadata['Latest release']}, "
+                    f"published {metadata['Published']} | Created: {metadata['Created']}"
+                ),
                 "",
             ])
             report = "\n".join(report_lines)
