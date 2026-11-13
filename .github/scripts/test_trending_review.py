@@ -196,6 +196,49 @@ class TrendingReviewTests(unittest.TestCase):
         )
         self.assertEqual(remaining, [])
 
+    def test_trending_stars_are_adjusted_for_period(self):
+        self.assertEqual(
+            review.get_period_adjusted_star_growth({'trending_delta': '+10 stars today'}),
+            70
+        )
+        self.assertEqual(
+            review.get_period_adjusted_star_growth({'trending_delta': '+70 stars this week'}),
+            70
+        )
+        self.assertAlmostEqual(
+            review.get_period_adjusted_star_growth({'trending_delta': '+304 stars this month'}),
+            70,
+            places=1
+        )
+
+    def test_candidate_score_balances_popularity_momentum_and_maturity(self):
+        base = {
+            'forks': 200,
+            'total_releases': 10,
+            'created_at': '2023-11-03T00:00:00Z',
+            'pushed_at': '2026-11-03T00:00:00Z',
+            'published_at': '2026-11-03T00:00:00Z',
+            'trending_delta': '+10 stars this week',
+        }
+        established = {**base, 'stars': 1000}
+        younger = {**established, 'created_at': '2025-11-03T00:00:00Z'}
+        trending = {
+            **base,
+            'stars': 10,
+            'forks': 1,
+            'total_releases': 1,
+            'trending_delta': '+1,200 stars this week',
+        }
+
+        self.assertGreater(
+            review.get_candidate_priority(established),
+            review.get_candidate_priority(trending)
+        )
+        self.assertGreater(
+            review.get_candidate_priority(established),
+            review.get_candidate_priority(younger)
+        )
+
     @patch('builtins.print')
     @patch.object(review.subprocess, 'run')
     def test_generated_issue_body_only_adds_optional_hints(self, run, _print):
