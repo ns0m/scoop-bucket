@@ -39,6 +39,29 @@ class TrendingReviewTests(unittest.TestCase):
         )
         self.assertEqual(review.get_bucket_name('https://github.com/ScoopInstaller/Extras'), 'extras')
 
+    def test_candidate_package_names_include_owner_and_repo_variants(self):
+        names = review.get_candidate_package_names('docker/compose')
+        self.assertIn('compose', names)
+        self.assertIn('docker-compose', names)
+        self.assertIn('dockercompose', names)
+
+        evidence = review.find_official_duplicate_evidence(
+            {
+                'repo': 'docker/compose',
+                'name': 'compose',
+                'package_names': names,
+                'win_assets': [],
+            },
+            [{
+                'name': 'docker-compose',
+                'repository': 'ScoopInstaller/Main',
+                'homepage': '',
+                'homepage_repo': '',
+                'signals': review.get_manifest_signals({}),
+            }]
+        )
+        self.assertIn('manifest name', next(iter(evidence.values())))
+
     def test_relative_date_handles_utc_and_invalid_input(self):
         self.assertIn('2026-01-01', review.format_relative_date('2026-01-01T00:00:00Z'))
         self.assertEqual(review.format_relative_date('not-a-date'), 'not-a-date')

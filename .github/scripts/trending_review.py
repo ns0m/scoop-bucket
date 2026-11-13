@@ -160,8 +160,12 @@ def normalize_package_name(name):
     return re.sub(r'[^a-z0-9]', '', name.lower())
 
 def get_candidate_package_names(repo_full_name):
-    repo_slug = repo_full_name.rsplit('/', 1)[-1].lower()
-    return {repo_slug, normalize_package_name(repo_slug)} - {''}
+    owner, _, repo_slug = repo_full_name.lower().partition('/')
+    names = {repo_slug, normalize_package_name(repo_slug)}
+    if owner and repo_slug:
+        names.add(f'{owner}-{repo_slug}')
+        names.add(normalize_package_name(f'{owner}{repo_slug}'))
+    return names - {''}
 
 def normalize_github_repo(value):
     value = (value or '').strip().rstrip('.,);]')
