@@ -597,6 +597,7 @@ def collect_existing_issue_keys(issues):
     seen_repos = set()
     seen_names = set()
     seen_pairs = set()
+    issue_by_pair = {}
     for iss in issues:
         body = iss.get('body') or ''
         title = iss.get('title') or ''
@@ -621,11 +622,18 @@ def collect_existing_issue_keys(issues):
             if normalized:
                 seen_names.add(normalized)
                 issue_names.add(normalized)
-        seen_pairs.update((repo, name) for repo in issue_repos for name in issue_names)
-    return seen_repos, seen_names, seen_pairs
+        issue = {
+            'number': iss.get('number'),
+            'state': iss.get('state', 'UNKNOWN').lower(),
+            'url': iss.get('url', ''),
+        }
+        for pair in ((repo, name) for repo in issue_repos for name in issue_names):
+            seen_pairs.add(pair)
+            issue_by_pair.setdefault(pair, []).append(issue)
+    return seen_repos, seen_names, seen_pairs, issue_by_pair
 
 def get_existing_issues():
-    cmd = ["gh", "issue", "list", "--state", "all", "--limit", "1000", "--json", "title,body,number"]
+    cmd = ["gh", "issue", "list", "--state", "all", "--limit", "1000", "--json", "title,body,number,state,url"]
     try:
         res = subprocess.run(cmd, check=False, capture_output=True, text=True)
     except OSError as e:
@@ -638,6 +646,30 @@ def get_existing_issues():
         raise RuntimeError(f"Could not parse existing issues: {e}") from e
 
     return collect_existing_issue_keys(issues)
+
+def filter_existing_issue_candidates(candidates, existing_pairs, seen_repos, seen_names):
+    remaining = []
+    for candidate in candidates:
+        repo = normalize_github_repo(candidate['repo'])
+        name = normalize_package_name(candidate['name'])
+        issues = existing_pairs.get((repo, name))
+        if issues:
+            details = ', '.join(
+                f"{issue['state']} issue #{issue['number']} {issue['url']}".strip()
+                for issue in issues
+            )
+            print(f"      skipped · existing {details} | {candidate['repo']}")
+            continue
+        if repo in seen_repos:
+            candidate['duplicate_hints'].append(
+                "An existing issue references this repository under a different candidate name."
+            )
+        if name in seen_names:
+            candidate['duplicate_hints'].append(
+                "An existing issue uses this normalized candidate name for another or unknown repository."
+            )
+        remaining.append(candidate)
+    return remaining
 
 def get_candidate_metadata(candidate):
     repo = candidate['repo']
@@ -868,37 +900,27 @@ def main():
 
     # Step 2: process candidates (create issues or display locally).
     print("\n[2/2] Processing candidates...")
-    if not args.local and os.getenv("GITHUB_ACTIONS"):
+    if final_candidates:
         try:
-            seen_issue_repos, seen_issue_names, seen_issue_pairs = get_existing_issues()
+            seen_issue_repos, seen_issue_names, seen_issue_pairs, issue_by_pair = get_existing_issues()
         except RuntimeError as e:
-            print_alert(f"Could not verify existing issues; refusing to create potentially duplicate issues: {e}")
+            print_alert(f"Could not verify existing repository issues; refusing to report or create unchecked candidates: {e}")
             return 1
-        print(f"      Existing issues checked: {len(seen_issue_repos)} repositories already tracked.")
+        print(f"      Existing issues checked (open and closed): {len(seen_issue_pairs)} candidate pairs.")
+        final_candidates = filter_existing_issue_candidates(
+            final_candidates, issue_by_pair, seen_issue_repos, seen_issue_names
+        )
 
+    if not args.local and os.getenv("GITHUB_ACTIONS"):
         issues_created = 0
         for c in final_candidates:
             if issues_created >= args.max_issues:
                 print_alert(f"Maximum issue limit reached ({args.max_issues}). Remaining candidates will be processed in a future run.")
                 break
 
-            repo_key = normalize_github_repo(c['repo'])
-            name_key = normalize_package_name(c['name'])
-
-            if (repo_key, name_key) in seen_issue_pairs:
-                print(f"      skipped · issue already exists | {c['repo']}")
-                continue
-            if repo_key in seen_issue_repos:
-                c['duplicate_hints'].append("An existing issue references this repository under a different candidate name.")
-            if name_key in seen_issue_names:
-                c['duplicate_hints'].append("An existing issue uses this normalized candidate name for another or unknown repository.")
-
             issue_url = create_candidate_issue(c, c['language'])
             if issue_url:
                 issues_created += 1
-                seen_issue_repos.add(repo_key)
-                seen_issue_names.add(name_key)
-                seen_issue_pairs.add((repo_key, name_key))
         print(f"[+] Done. Created {issues_created} new issue(s).")
     else:
         # Sortie locale

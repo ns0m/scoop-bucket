@@ -119,13 +119,59 @@ class TrendingReviewTests(unittest.TestCase):
         self.assertNotIn('nu', review.get_candidate_package_names('nushell/nushell'))
 
     def test_existing_issue_keys_preserve_repo_name_pairs(self):
-        repos, names, pairs = review.collect_existing_issue_keys([{
+        repos, names, pairs, issues_by_pair = review.collect_existing_issue_keys([{
             'title': '[Candidate]: notepad-plus-plus (GUI)',
             'body': '### Candidate: `NotepadPlusPlus`\nhttps://github.com/earendil-works/pi',
+            'number': 42,
+            'state': 'CLOSED',
+            'url': 'https://github.com/ns0m/scoop-bucket/issues/42',
         }])
         self.assertIn('earendil-works/pi', repos)
         self.assertIn('notepadplusplus', names)
         self.assertIn(('earendil-works/pi', 'notepadplusplus'), pairs)
+        self.assertEqual(
+            issues_by_pair[('earendil-works/pi', 'notepadplusplus')][0]['state'],
+            'closed'
+        )
+
+    def test_existing_issue_lookup_includes_open_and_closed(self):
+        issues = [{
+            'title': '[Candidate]: tool (CLI)',
+            'body': 'https://github.com/owner/tool',
+            'number': 7,
+            'state': 'CLOSED',
+            'url': 'https://github.com/ns0m/scoop-bucket/issues/7',
+        }]
+        result = type('Result', (), {
+            'returncode': 0,
+            'stdout': json.dumps(issues),
+            'stderr': '',
+        })()
+        with patch.object(review.subprocess, 'run', return_value=result) as run:
+            _, _, pairs, by_pair = review.get_existing_issues()
+
+        self.assertIn('--state', run.call_args.args[0])
+        self.assertIn('all', run.call_args.args[0])
+        self.assertIn('title,body,number,state,url', run.call_args.args[0])
+        self.assertIn(('owner/tool', 'tool'), pairs)
+        self.assertEqual(by_pair[('owner/tool', 'tool')][0]['state'], 'closed')
+
+    @patch('builtins.print')
+    def test_existing_open_or_closed_pair_is_filtered(self, _print):
+        candidate = {
+            'repo': 'owner/tool',
+            'name': 'tool',
+            'duplicate_hints': [],
+        }
+        open_issue = {'state': 'open', 'number': 1, 'url': 'https://example.test/1'}
+        closed_issue = {'state': 'closed', 'number': 2, 'url': 'https://example.test/2'}
+        remaining = review.filter_existing_issue_candidates(
+            [candidate],
+            {('owner/tool', 'tool'): [open_issue, closed_issue]},
+            {'owner/tool'},
+            {'tool'},
+        )
+        self.assertEqual(remaining, [])
 
     @patch('builtins.print')
     @patch.object(review.subprocess, 'run')
