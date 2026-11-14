@@ -85,7 +85,7 @@ class TrendingReviewTests(unittest.TestCase):
         )
         self.assertEqual(evidence['notepadplusplus'], {'manifest name'})
 
-    def test_exact_url_or_hash_is_strong_evidence(self):
+    def test_exact_url_or_hash_alone_is_strong_evidence(self):
         manifest = review.get_manifest_signals({
             'url': 'https://example.test/tool.zip#/dl.7z',
             'hash': 'b' * 64,
@@ -104,7 +104,7 @@ class TrendingReviewTests(unittest.TestCase):
         self.assertEqual(evidence['existing-tool'], {'download URL', 'SHA-256'})
         self.assertTrue(review.has_strong_duplicate_evidence(evidence))
 
-    def test_names_and_binary_alone_are_only_hints(self):
+    def test_manifest_name_and_binary_alone_are_only_hints(self):
         candidate = {
             'repo': 'example/tool',
             'name': 'tool',
@@ -112,17 +112,18 @@ class TrendingReviewTests(unittest.TestCase):
             'win_assets': [{'name': 'tool.exe', 'url': 'https://download.example/tool.zip'}],
         }
         manifest = review.get_manifest_signals({
-            'homepage': candidate['homepage'],
+            'homepage': 'https://other.example/tool',
             'bin': 'tool.exe',
         })
         evidence = review.find_manifest_duplicate_evidence(candidate, {'tool': manifest})
-        self.assertEqual(evidence['tool'], {'homepage', 'binary name', 'manifest name'})
+        self.assertEqual(evidence['tool'], {'binary name', 'manifest name'})
         self.assertFalse(review.has_strong_duplicate_evidence(evidence))
 
-    def test_official_name_and_source_repository_are_strong_evidence(self):
+    def test_manifest_name_and_checkver_repository_are_strong_evidence(self):
         candidate = {
             'repo': 'astral-sh/ruff',
             'name': 'ruff',
+            'homepage': 'https://github.com/astral-sh/ruff',
             'package_names': {'ruff'},
             'win_assets': [],
         }
@@ -136,6 +137,52 @@ class TrendingReviewTests(unittest.TestCase):
             }),
         }
         evidence = review.find_official_duplicate_evidence(candidate, [manifest])
+        self.assertTrue(review.has_strong_duplicate_evidence(evidence))
+
+    def test_manifest_name_and_product_homepage_are_strong_evidence(self):
+        candidate = {
+            'repo': 'jenkinsci/jenkins',
+            'name': 'jenkins',
+            'homepage': 'https://www.jenkins.io',
+            'package_names': {'jenkins'},
+            'win_assets': [],
+        }
+        manifest = {
+            'name': 'jenkins',
+            'repository': 'ScoopInstaller/Main',
+            'homepage': candidate['homepage'],
+            'homepage_repo': '',
+            'signals': review.get_manifest_signals({
+                'homepage': candidate['homepage'],
+                'bin': 'jenkins.jar',
+            }),
+        }
+        evidence = review.find_official_duplicate_evidence(candidate, [manifest])
+        self.assertEqual(next(iter(evidence.values())), {'manifest name', 'homepage'})
+        self.assertTrue(review.has_strong_duplicate_evidence(evidence))
+
+    def test_manifest_name_and_repository_homepage_are_strong_evidence(self):
+        candidate = {
+            'repo': 'astral-sh/ruff',
+            'name': 'ruff',
+            'homepage': 'https://github.com/astral-sh/ruff',
+            'package_names': {'ruff'},
+            'win_assets': [],
+        }
+        manifest = {
+            'name': 'ruff',
+            'repository': 'ScoopInstaller/Main',
+            'homepage': 'https://github.com/astral-sh/ruff',
+            'homepage_repo': 'astral-sh/ruff',
+            'signals': review.get_manifest_signals({
+                'homepage': 'https://github.com/astral-sh/ruff',
+            }),
+        }
+        evidence = review.find_official_duplicate_evidence(candidate, [manifest])
+        self.assertEqual(
+            next(iter(evidence.values())),
+            {'manifest name', 'repository/homepage', 'homepage', 'repository'}
+        )
         self.assertTrue(review.has_strong_duplicate_evidence(evidence))
 
     def test_semantic_alias_is_not_inferred(self):

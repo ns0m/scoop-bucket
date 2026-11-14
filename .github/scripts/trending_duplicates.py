@@ -290,6 +290,7 @@ def has_strong_duplicate_evidence(evidence):
         'download URL' in reasons
         or 'SHA-256' in reasons
         or {'repository', 'manifest name'} <= reasons
+        or {'homepage', 'manifest name'} <= reasons
         or {'repository/homepage', 'manifest name'} <= reasons
         for reasons in evidence.values()
     )
