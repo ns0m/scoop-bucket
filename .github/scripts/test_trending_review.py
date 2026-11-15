@@ -1,3 +1,4 @@
+import io
 import json
 import tempfile
 import unittest
@@ -62,6 +63,58 @@ class TrendingReviewTests(unittest.TestCase):
         )
         self.assertIn('manifest name', next(iter(evidence.values())))
 
+    def test_official_cli_variant_is_found_as_a_review_hint(self):
+        index_result = [{
+            'Name': 'freerouting-cli',
+            'Homepage': 'https://www.freerouting.app',
+            'Metadata': {
+                'Repository': 'https://github.com/ScoopInstaller/Main',
+                'BranchName': 'master',
+                'FilePath': 'bucket/freerouting-cli.json',
+            },
+        }]
+        manifest_data = {
+            'homepage': 'https://www.freerouting.app',
+            'checkver': {'github': 'https://github.com/freerouting/freerouting'},
+            'architecture': {
+                '64bit': {
+                    'url': 'https://github.com/freerouting/freerouting/releases/download/v2.5.0/freerouting-cli-2.5.0-windows-x64.zip',
+                    'hash': 'a' * 64,
+                },
+            },
+            'bin': 'freerouting-cli.exe',
+        }
+
+        def fake_urlopen(request, timeout):
+            if 'scoopsearch.search.windows.net' in request.full_url:
+                payload = json.loads(request.data.decode('utf-8'))
+                self.assertIn('freerouting-cli', payload['filter'])
+                return io.BytesIO(json.dumps({'value': index_result}).encode('utf-8'))
+            return io.BytesIO(json.dumps(manifest_data).encode('utf-8'))
+
+        candidate = {
+            'repo': 'freerouting/freerouting',
+            'name': 'freerouting',
+            'homepage': 'https://www.freerouting.app',
+            'package_names': review.get_candidate_package_names('freerouting/freerouting'),
+            'win_assets': [{
+                'name': 'freerouting-2.5.0-windows-x64.zip',
+                'url': 'https://github.com/freerouting/freerouting/releases/download/v2.5.0/freerouting-2.5.0-windows-x64.zip',
+            }],
+        }
+
+        with patch.object(review.urllib.request, 'urlopen', side_effect=fake_urlopen):
+            manifests = review.find_official_manifests([{
+                'repo': candidate['repo'],
+                'package_names': candidate['package_names'],
+            }])
+
+        evidence = review.find_official_duplicate_evidence(candidate, manifests)
+        reasons = next(iter(evidence.values()))
+        self.assertIn('repository', reasons)
+        self.assertNotIn('manifest name', reasons)
+        self.assertFalse(review.has_strong_duplicate_evidence(evidence))
+
     def test_relative_date_handles_utc_and_invalid_input(self):
         self.assertIn('2026-01-01', review.format_relative_date('2026-01-01T00:00:00Z'))
         self.assertEqual(review.format_relative_date('not-a-date'), 'not-a-date')
@@ -103,6 +156,30 @@ class TrendingReviewTests(unittest.TestCase):
         evidence = review.find_manifest_duplicate_evidence(candidate, {'existing-tool': manifest})
         self.assertEqual(evidence['existing-tool'], {'download URL', 'SHA-256'})
         self.assertTrue(review.has_strong_duplicate_evidence(evidence))
+
+    def test_explicit_cli_asset_does_not_duplicate_a_gui_candidate(self):
+        manifest = review.get_manifest_signals({
+            'url': 'https://example.test/freerouting-cli.zip',
+            'hash': 'b' * 64,
+        })
+        candidate = {
+            'repo': 'freerouting/freerouting',
+            'name': 'freerouting',
+            'type': 'GUI',
+            'homepage': 'https://www.freerouting.app',
+            'win_assets': [{
+                'name': 'freerouting-cli-2.5.0-windows-x64.zip',
+                'url': 'https://example.test/freerouting-cli.zip',
+                'digest': 'sha256:' + ('b' * 64),
+            }],
+        }
+
+        evidence = review.find_manifest_duplicate_evidence(
+            candidate,
+            {'freerouting-cli': manifest}
+        )
+
+        self.assertEqual(evidence, {})
 
     def test_manifest_name_and_binary_alone_are_only_hints(self):
         candidate = {

@@ -114,13 +114,32 @@ def get_manifest_signals(data):
     }
 
 
+def is_component_mismatch(asset_name, candidate_type):
+    component = (candidate_type or '').lower()
+    if component not in {'cli', 'gui'}:
+        return False
+    asset_component = re.search(
+        r'(?:^|[-_.\s])(cli|gui)(?:[-_.\s]|$)',
+        (asset_name or '').lower()
+    )
+    return bool(asset_component and asset_component.group(1) != component)
+
+
 def find_official_manifests(candidates):
     candidate_names = set().union(*(item['package_names'] for item in candidates))
     candidate_repos = {
         normalize_github_repo(item['repo']) for item in candidates
     } - {''}
     normalized_names = {normalize_package_name(name) for name in candidate_names} - {''}
-    search_names = sorted(candidate_names | normalized_names)
+    related_names = {
+        f'{name}-{suffix}'
+        for name in normalized_names
+        for suffix in ('cli', 'gui')
+    }
+    search_names = sorted(candidate_names | normalized_names | related_names)
+    searchable_names = normalized_names | {
+        normalize_package_name(name) for name in related_names
+    }
     repo_filter = " or ".join(
         f"Homepage eq '{scheme}://{host}/{owner}/{name}{suffix}'"
         for owner, name in (repo.split('/', 1) for repo in candidate_repos)
@@ -166,7 +185,7 @@ def find_official_manifests(candidates):
         for item in data.get('value', []):
             name = normalize_package_name(item.get('Name', ''))
             homepage_repo = normalize_github_repo(item.get('Homepage', ''))
-            if name not in normalized_names and homepage_repo not in candidate_repos:
+            if name not in searchable_names and homepage_repo not in candidate_repos:
                 continue
             repository = item.get('Metadata', {}).get('Repository')
             if not repository:
@@ -221,7 +240,10 @@ def fetch_official_manifest_signals(repository, branch, file_path):
 def find_manifest_duplicate_evidence(candidate, manifests):
     repo = normalize_github_repo(candidate['repo'])
     homepage = candidate.get('homepage', '')
-    assets = candidate.get('win_assets', [])
+    assets = [
+        asset for asset in candidate.get('win_assets', [])
+        if not is_component_mismatch(asset.get('name', ''), candidate.get('type'))
+    ]
     asset_urls = {
         normalize_download_url(asset.get('url', '')) for asset in assets
     } - {''}
