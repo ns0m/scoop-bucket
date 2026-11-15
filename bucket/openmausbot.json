@@ -1,0 +1,33 @@
+{
+    "version": "0.1.160",
+    "description": "Open-source Grok Bot alternative: a local-first chat app running a team of AI agents, each with its own computer.",
+    "homepage": "https://mausbot.com",
+    "license": "Apache-2.0",
+    "architecture": {
+        "64bit": {
+            "url": "https://github.com/milind-soni/OpenMausBot/releases/download/v0.1.160/OpenMausBot-setup.exe#/dl.7z",
+            "hash": "8fa85e27dfde398c4fdec4c1b7881666ee2bebfcf9008d5a72741c88e2b5f710"
+        }
+    },
+    "pre_install": [
+        "Expand-7zipArchive \"$dir\\`$PLUGINSDIR\\app-64.7z\" \"$dir\" -Removal",
+        "Remove-Item \"$dir\\`$PLUGINSDIR\", \"$dir\\`$R0\" -Recurse -Force -ErrorAction SilentlyContinue"
+    ],
+    "shortcuts": [
+        [
+            "OpenMausBot.exe",
+            "OpenMausBot"
+        ]
+    ],
+    "checkver": {
+        "github": "https://github.com/milind-soni/OpenMausBot"
+    },
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": "https://github.com/milind-soni/OpenMausBot/releases/download/v$version/OpenMausBot-setup.exe#/dl.7z"
+            }
+        }
+    },
+    "notes": "Bots drive the claude, codex or grok CLI already installed on this machine. State lives in %USERPROFILE%\\.openmausbot."
+}
