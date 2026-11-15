@@ -1,0 +1,47 @@
+{
+    "version": "0.7.1",
+    "description": "Entity-level git merge driver that resolves the false conflicts git reports when independent agents edit different functions in the same file.",
+    "homepage": "https://ataraxy-labs.github.io/weave/",
+    "license": "Apache-2.0",
+    "suggest": {
+        "vcredist": "extras/vcredist2022"
+    },
+    "notes": [
+        "Run `weave setup` in a repository (or `weave setup --global`) to register the merge driver.",
+        "`weave setup` records the bare `weave-driver` command, resolved through PATH at merge time: if a Git client starts without Scoop's shims (some GUIs), use `weave setup --driver <full path to weave-driver.exe>` instead.",
+        "On Windows `weave setup` warns that 'weave-driver' was not found even when it works: the driver is run from PATH, as `weave-driver.exe`."
+    ],
+    "architecture": {
+        "64bit": {
+            "url": [
+                "https://github.com/Ataraxy-Labs/weave/releases/download/v0.7.1/weave-cli-x86_64-pc-windows-msvc.zip",
+                "https://github.com/Ataraxy-Labs/weave/releases/download/v0.7.1/weave-driver-x86_64-pc-windows-msvc.zip",
+                "https://github.com/Ataraxy-Labs/weave/releases/download/v0.7.1/weave-mcp-x86_64-pc-windows-msvc.zip"
+            ],
+            "hash": [
+                "1a5bfb56b5e819fb249c9f81dba43c0bf99fafa89004d86c51a6fd610b7e4ab7",
+                "701faa96cc037fbbe1f68aef53a5e3f9b626a451dcf662dfc551e3513aa20f34",
+                "f3093d14e408270659876d31f54595a7ff081dfdd8b1e8ecb807dfa4e38e47e0"
+            ]
+        }
+    },
+    "bin": [
+        "weave.exe",
+        "weave-driver.exe",
+        "weave-mcp.exe"
+    ],
+    "checkver": {
+        "github": "https://github.com/Ataraxy-Labs/weave"
+    },
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": [
+                    "https://github.com/Ataraxy-Labs/weave/releases/download/v$version/weave-cli-x86_64-pc-windows-msvc.zip",
+                    "https://github.com/Ataraxy-Labs/weave/releases/download/v$version/weave-driver-x86_64-pc-windows-msvc.zip",
+                    "https://github.com/Ataraxy-Labs/weave/releases/download/v$version/weave-mcp-x86_64-pc-windows-msvc.zip"
+                ]
+            }
+        }
+    }
+}
