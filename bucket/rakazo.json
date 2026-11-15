@@ -1,0 +1,32 @@
+{
+    "version": "0.11.0",
+    "description": "Self-hosted alternative to Grok Bot: persistent AI teammates with their own memory, routines and computer, on your own model and sandbox.",
+    "homepage": "https://rakazo.com",
+    "license": "Apache-2.0",
+    "architecture": {
+        "64bit": {
+            "url": "https://github.com/elie222/rakazo/releases/download/v0.11.0/Rakazo-Setup-0.11.0.exe#/dl.7z",
+            "hash": "8b5004f28af9999cf397174f05c3ed40eb166784d7d36cc29223e9bc2f672de4"
+        }
+    },
+    "pre_install": [
+        "Expand-7zipArchive \"$dir\\`$PLUGINSDIR\\app-64.7z\" \"$dir\" -Removal",
+        "Remove-Item \"$dir\\`$PLUGINSDIR\", \"$dir\\`$R0\" -Recurse -Force -ErrorAction SilentlyContinue"
+    ],
+    "shortcuts": [
+        [
+            "Rakazo.exe",
+            "Rakazo"
+        ]
+    ],
+    "checkver": {
+        "github": "https://github.com/elie222/rakazo"
+    },
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": "https://github.com/elie222/rakazo/releases/download/v$version/Rakazo-Setup-$version.exe#/dl.7z"
+            }
+        }
+    }
+}
