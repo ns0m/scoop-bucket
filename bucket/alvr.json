@@ -1,0 +1,28 @@
+{
+    "version": "20.14.1",
+    "description": "Stream VR games from your PC to your headset via Wi-Fi.",
+    "homepage": "https://github.com/alvr-org/ALVR",
+    "license": "MIT",
+    "notes": "Use 'Install ALVR' in the launcher to download the streamer. Streamer installations are kept in the 'installations' folder across updates.",
+    "architecture": {
+        "64bit": {
+            "url": "https://github.com/alvr-org/ALVR/releases/download/v20.14.1/alvr_launcher_windows.zip",
+            "hash": "2f382fc9da4b3d8855faeb1c18036650f4938949dc95cf39de65d42d7dd7e959"
+        }
+    },
+    "shortcuts": [
+        [
+            "ALVR Launcher.exe",
+            "ALVR Launcher"
+        ]
+    ],
+    "persist": "installations",
+    "checkver": "github",
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": "https://github.com/alvr-org/ALVR/releases/download/v$version/alvr_launcher_windows.zip"
+            }
+        }
+    }
+}
