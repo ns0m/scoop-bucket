@@ -1,10 +1,10 @@
 {
-    "version": "0.1.5-pre.20261114.e39791be4",
+    "version": "0.1.5-pre.20261115.28de5674f",
     "description": "Safe, private runtime for fleets of autonomous AI agents (native Windows build)",
     "homepage": "https://docs.nvidia.com/openshell/",
     "license": "Apache-2.0",
-    "url": "https://github.com/ns0m/openshell-windows/releases/download/0.1.5-pre.20261114.e39791be4/openshell-windows-x64.zip",
-    "hash": "102409d3721fa55cd338cb69214029ab28181fb468fa9e4f0e53d27b4ec15c1d",
+    "url": "https://github.com/ns0m/openshell-windows/releases/download/0.1.5-pre.20261115.28de5674f/openshell-windows-x64.zip",
+    "hash": "d5bf3534e735ef96b9014b5c5092d62d5c2c776a57ac06ab7f5d79db65b536c3",
     "depends": "mxc",
     "bin": [
         "openshell.exe",
