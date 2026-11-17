@@ -6,10 +6,32 @@ import sys
 import urllib.request
 from urllib.parse import quote, urlsplit
 
+BUCKETS_JSON_URL = "https://raw.githubusercontent.com/ScoopInstaller/Scoop/master/buckets.json"
 SCOOP_SEARCH_URL = "https://scoopsearch.search.windows.net/indexes/apps/docs/search?api-version=2020-06-30"
 # Public read-only key used by scoop.sh's frontend.
 SCOOP_SEARCH_KEY = "DC6D2BBE65FC7313F2C52BBD2B0286ED"
 SCOOP_SEARCH_BATCH_SIZE = 50
+
+
+def get_official_bucket_repos():
+    """Official buckets are the ones named in Scoop's buckets.json."""
+    request = urllib.request.Request(
+        BUCKETS_JSON_URL,
+        headers={'User-Agent': 'ns0m-ScoopTrendingReview/2.0'}
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            buckets = json.loads(response.read().decode('utf-8'))
+    except (OSError, UnicodeError, json.JSONDecodeError) as e:
+        raise RuntimeError(f"Could not read Scoop's official bucket list: {e}") from e
+    if not isinstance(buckets, dict):
+        raise RuntimeError("Scoop's buckets.json is not a JSON object")
+    repos = {
+        normalize_github_repo(url) for url in buckets.values() if isinstance(url, str)
+    } - {''}
+    if not repos:
+        raise RuntimeError("Scoop's buckets.json listed no official bucket repositories")
+    return repos
 
 
 def print_alert(message):
@@ -126,6 +148,7 @@ def is_component_mismatch(asset_name, candidate_type):
 
 
 def find_official_manifests(candidates):
+    official_repos = get_official_bucket_repos()
     candidate_names = set().union(*(item['package_names'] for item in candidates))
     candidate_repos = {
         normalize_github_repo(item['repo']) for item in candidates
@@ -160,7 +183,6 @@ def find_official_manifests(candidates):
         payload = {
             "search": "*",
             "filter": (
-                "Metadata/OfficialRepositoryNumber eq 1 and "
                 f"({' or '.join(filters)})"
             ),
             "top": 1000,
@@ -188,8 +210,8 @@ def find_official_manifests(candidates):
             if name not in searchable_names and homepage_repo not in candidate_repos:
                 continue
             repository = item.get('Metadata', {}).get('Repository')
-            if not repository:
-                raise RuntimeError(f"Official manifest '{name}' has no repository listed in the Scoop index")
+            if normalize_github_repo(repository or '') not in official_repos:
+                continue
             repository = repository.rstrip('/')
             key = (item.get('Name', ''), repository, item.get('Homepage', ''))
             if key in matches:

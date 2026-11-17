@@ -86,6 +86,10 @@ class TrendingReviewTests(unittest.TestCase):
         }
 
         def fake_urlopen(request, timeout):
+            if 'buckets.json' in request.full_url:
+                return io.BytesIO(json.dumps({
+                    'main': 'https://github.com/ScoopInstaller/Main',
+                }).encode('utf-8'))
             if 'scoopsearch.search.windows.net' in request.full_url:
                 payload = json.loads(request.data.decode('utf-8'))
                 self.assertIn('freerouting-cli', payload['filter'])
@@ -114,6 +118,50 @@ class TrendingReviewTests(unittest.TestCase):
         self.assertIn('repository', reasons)
         self.assertNotIn('manifest name', reasons)
         self.assertFalse(review.has_strong_duplicate_evidence(evidence))
+
+    def test_official_buckets_come_from_buckets_json(self):
+        buckets = {
+            'main': 'https://github.com/ScoopInstaller/Main',
+            'nerd-fonts': 'https://github.com/matthewjberger/scoop-nerd-fonts',
+        }
+        index_result = [
+            {
+                'Name': 'tool-font',
+                'Homepage': 'https://example.test',
+                'Metadata': {
+                    'Repository': 'https://github.com/matthewjberger/scoop-nerd-fonts',
+                    'BranchName': 'master',
+                    'FilePath': 'bucket/tool-font.json',
+                },
+            },
+            {
+                'Name': 'tool-font',
+                'Homepage': 'https://example.test',
+                'Metadata': {
+                    'Repository': 'https://github.com/thirdparty/scoop-bucket',
+                    'BranchName': 'main',
+                    'FilePath': 'bucket/tool-font.json',
+                },
+            },
+        ]
+
+        def fake_urlopen(request, timeout):
+            if 'buckets.json' in request.full_url:
+                return io.BytesIO(json.dumps(buckets).encode('utf-8'))
+            if 'scoopsearch.search.windows.net' in request.full_url:
+                return io.BytesIO(json.dumps({'value': index_result}).encode('utf-8'))
+            return io.BytesIO(json.dumps({'homepage': 'https://example.test'}).encode('utf-8'))
+
+        with patch.object(review.urllib.request, 'urlopen', side_effect=fake_urlopen):
+            manifests = review.find_official_manifests([{
+                'repo': 'example/tool',
+                'package_names': {'tool-font'},
+            }])
+
+        self.assertEqual(
+            [manifest['repository'] for manifest in manifests],
+            ['https://github.com/matthewjberger/scoop-nerd-fonts']
+        )
 
     def test_relative_date_handles_utc_and_invalid_input(self):
         self.assertIn('2026-01-01', review.format_relative_date('2026-01-01T00:00:00Z'))
