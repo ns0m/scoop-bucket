@@ -213,6 +213,7 @@ def find_official_manifests(candidates):
             if normalize_github_repo(repository or '') not in official_repos:
                 continue
             repository = repository.rstrip('/')
+            metadata = item.get('Metadata', {})
             key = (item.get('Name', ''), repository, item.get('Homepage', ''))
             if key in matches:
                 continue
@@ -221,8 +222,8 @@ def find_official_manifests(candidates):
                 'repository': repository,
                 'homepage': item.get('Homepage', ''),
                 'homepage_repo': homepage_repo,
+                'file_path': metadata.get('FilePath', ''),
             }
-            metadata = item.get('Metadata', {})
             try:
                 manifest['signals'] = fetch_official_manifest_signals(
                     repository,
