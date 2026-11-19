@@ -1,12 +1,12 @@
 {
-    "version": "1.3.0",
+    "version": "1.4.0",
     "description": "Feature-rich, native desktop YouTube Music client",
     "homepage": "https://simohypers.github.io/limusic/",
     "license": "GPL-3.0-only",
     "architecture": {
         "64bit": {
-            "url": "https://github.com/SimoHypers/limusic/releases/download/v1.3.0/limusic_1.3.0_x64-setup.exe#/dl.7z",
-            "hash": "f9cd822af29ad88d0842a0ac0ca066286a668f263f3740a97c7b18a57b9963fc"
+            "url": "https://github.com/SimoHypers/limusic/releases/download/v1.4.0/limusic_1.4.0_x64-setup.exe#/dl.7z",
+            "hash": "3615248bd94d6e2e57adf044701fb2eafb9ba9c6037de502baaa7f08674fa34c"
         }
     },
     "pre_install": [
