@@ -1,0 +1,43 @@
+{
+    "version": "0.2.2",
+    "description": "Lightweight container runtime with the Docker Engine API, running on WSL 2",
+    "homepage": "https://runkiri.com",
+    "license": "Apache-2.0",
+    "architecture": {
+        "64bit": {
+            "url": "https://github.com/libracoder/kiri/releases/download/v0.2.2/Kiri-0.2.2-x86_64.msi",
+            "hash": "647128f8ca4831020da683f4301f16238d3417bc01519def687073e036271ca8"
+        },
+        "arm64": {
+            "url": "https://github.com/libracoder/kiri/releases/download/v0.2.2/Kiri-0.2.2-arm64.msi",
+            "hash": "6f759006c63a8be1d370b234062bf496b2799560a8f23c10f60eeaff2320dcd7"
+        }
+    },
+    "extract_dir": "LocalApp\\Kiri",
+    "bin": "bin\\kiri.exe",
+    "shortcuts": [
+        [
+            "kiri-win.exe",
+            "Kiri"
+        ]
+    ],
+    "notes": [
+        "Requires Windows 10/11 with WSL 2. Open Kiri after installing to run its first-run setup; it installs the engine, configures the Docker context, and adds the bundled CLI to your user PATH. It may ask for administrator approval to install WSL or configure DNS.",
+        "Scoop extracts the MSI instead of running its installer actions. Kiri's first-run setup copies its bundle to %LOCALAPPDATA%\\Kiri. The manifest creates a Scoop shortcut, but not the MSI registry entry or uninstall cleanup.",
+        "Kiri has a built-in updater. Disable automatic updates in Kiri's Settings and use 'scoop update kiri' to keep the Scoop-managed version current.",
+        "Scoop uninstall does not remove Kiri's WSL distro, Docker context, or PATH entries. To fully remove Kiri, run '& \"$env:LOCALAPPDATA\\Kiri\\kiri.ps1\" -Uninstall -IfSetUp' before uninstalling; this removes Kiri's WSL distro and its data."
+    ],
+    "checkver": {
+        "github": "https://github.com/libracoder/kiri"
+    },
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": "https://github.com/libracoder/kiri/releases/download/v$version/Kiri-$version-x86_64.msi"
+            },
+            "arm64": {
+                "url": "https://github.com/libracoder/kiri/releases/download/v$version/Kiri-$version-arm64.msi"
+            }
+        }
+    }
+}
