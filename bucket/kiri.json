@@ -25,7 +25,7 @@
         "Requires Windows 10/11 with WSL 2. Open Kiri after installing to run its first-run setup; it installs the engine, configures the Docker context, and adds the bundled CLI to your user PATH. It may ask for administrator approval to install WSL or configure DNS.",
         "Scoop extracts the MSI instead of running its installer actions. Kiri's first-run setup copies its bundle to %LOCALAPPDATA%\\Kiri. The manifest creates a Scoop shortcut, but not the MSI registry entry or uninstall cleanup.",
         "Kiri has a built-in updater. Disable automatic updates in Kiri's Settings and use 'scoop update kiri' to keep the Scoop-managed version current.",
-        "Scoop uninstall does not remove Kiri's WSL distro, Docker context, or PATH entries. To fully remove Kiri, run '& \"$env:LOCALAPPDATA\\Kiri\\kiri.ps1\" -Uninstall -IfSetUp' before uninstalling; this removes Kiri's WSL distro and its data."
+        "Scoop uninstall does not remove Kiri's WSL distro, Docker context, or PATH entries. Before uninstalling, run '& \"$(scoop prefix kiri)\\kiri.ps1\" -Uninstall -IfSetUp'; this removes Kiri's WSL distro and its data."
     ],
     "checkver": {
         "github": "https://github.com/libracoder/kiri"
