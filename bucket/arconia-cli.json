@@ -1,0 +1,31 @@
+{
+    "version": "0.19.4",
+    "description": "Companion CLI for Java, Spring Boot and Arconia projects",
+    "homepage": "https://docs.arconia.io/arconia-cli/latest",
+    "license": "Apache-2.0",
+    "suggest": {
+        "vcredist": "extras/vcredist2022"
+    },
+    "architecture": {
+        "64bit": {
+            "url": "https://github.com/arconia-io/arconia-cli/releases/download/v0.19.4/arconia-cli-0.19.4-windows-amd64.zip",
+            "hash": "db1baed71e7629014cfaff1d7e937643428f3251b05cd9365e0d182d9e6b0805"
+        }
+    },
+    "extract_dir": "arconia-cli-0.19.4-windows-amd64",
+    "bin": "bin\\arconia.exe",
+    "checkver": {
+        "github": "https://github.com/arconia-io/arconia-cli"
+    },
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": "https://github.com/arconia-io/arconia-cli/releases/download/v$version/arconia-cli-$version-windows-amd64.zip",
+                "hash": {
+                    "url": "$url.sha256"
+                }
+            }
+        },
+        "extract_dir": "arconia-cli-$version-windows-amd64"
+    }
+}
