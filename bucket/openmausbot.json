@@ -1,12 +1,12 @@
 {
-    "version": "0.1.176",
+    "version": "0.1.177",
     "description": "Open-source Grok Bot alternative: a local-first chat app running a team of AI agents, each with its own computer.",
     "homepage": "https://mausbot.com",
     "license": "Apache-2.0",
     "architecture": {
         "64bit": {
-            "url": "https://github.com/milind-soni/OpenMausBot/releases/download/v0.1.176/OpenMausBot-setup.exe#/dl.7z",
-            "hash": "91fd8671caa99bda4978bf0d9a9f89fdf3263934d042a7d9349f58e9bd88e61f"
+            "url": "https://github.com/milind-soni/OpenMausBot/releases/download/v0.1.177/OpenMausBot-setup.exe#/dl.7z",
+            "hash": "f655bb1716337c9daf903da9ed361b216228f217e99b70c7496f02d28c545b6a"
         }
     },
     "pre_install": [
