@@ -1,0 +1,23 @@
+{
+    "version": "2.0.0",
+    "description": "Static application security testing engine that finds security issues in 30+ languages",
+    "homepage": "https://opengrep.dev",
+    "license": "LGPL-2.1",
+    "architecture": {
+        "64bit": {
+            "url": "https://github.com/opengrep/opengrep/releases/download/v2.0.0/opengrep_windows_x86.zip",
+            "hash": "899a17e2b15863367cfd15032c93cdf482fd4e7ec8719c69de46f4f38b227864"
+        }
+    },
+    "bin": "opengrep.exe",
+    "checkver": {
+        "github": "https://github.com/opengrep/opengrep"
+    },
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": "https://github.com/opengrep/opengrep/releases/download/v$version/opengrep_windows_x86.zip"
+            }
+        }
+    }
+}
