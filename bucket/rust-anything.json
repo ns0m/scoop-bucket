@@ -1,14 +1,14 @@
 {
-    "version": "3.0.0",
+    "version": "3.1.0",
     "description": "Rewrites an app in Rust piece by piece, checking each piece against the original's recorded behavior",
     "homepage": "https://github.com/erkamyaman/rust-anything",
     "license": "MIT",
     "suggest": {
         "vcredist": "extras/vcredist2022"
     },
-    "url": "https://github.com/erkamyaman/rust-anything/releases/download/v3.0.0/rust-anything-v3.0.0-x86_64-pc-windows-msvc.zip",
-    "hash": "11056e34fad8a8a69da27d47c99b661aeff852d3c0c8593c4c1bc281fe3bda81",
-    "extract_dir": "rust-anything-v3.0.0-x86_64-pc-windows-msvc",
+    "url": "https://github.com/erkamyaman/rust-anything/releases/download/v3.1.0/rust-anything-v3.1.0-x86_64-pc-windows-msvc.zip",
+    "hash": "58ceb06f677625f98fa77060d89688c7ed04cde52295aaba60c3c83615b2999f",
+    "extract_dir": "rust-anything-v3.1.0-x86_64-pc-windows-msvc",
     "bin": "rust-anything.exe",
     "checkver": "github",
     "autoupdate": {
