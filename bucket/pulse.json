@@ -1,0 +1,54 @@
+{
+    "version": "1.0.60",
+    "description": "File manager for Windows with panes, saved workspaces, indexed search, previews, tags and batch renaming",
+    "homepage": "https://github.com/jimmgreen/pulse",
+    "license": "Apache-2.0",
+    "depends": "7zip",
+    "url": "https://github.com/jimmgreen/pulse/releases/download/v1.0.60/PulseSetup-1.0.60.exe",
+    "hash": "827aebcb14a9e4f4ec8281cf89e339cc887ec6f541ff6e80518ac463732c5234",
+    "pre_install": [
+        "$setup = Get-ChildItem \"$dir\\PulseSetup-*.exe\" | Select-Object -First 1",
+        "# The stub carries an xz stream of a PPKM file container; 7-Zip reports harmless trailing data from the stub on stderr, so its output is captured and only shown if extraction really fails.",
+        "$extract = & { $ErrorActionPreference = 'Continue'; & (Get-HelperPath -Helper 7zip) x -y \"-o$dir\\_payload\" $setup.FullName 2>&1 }",
+        "$payload = Get-ChildItem \"$dir\\_payload\" -File -ErrorAction SilentlyContinue | Select-Object -First 1",
+        "if (-not $payload) { $extract | Out-Host; throw \"Could not unpack the Pulse installer payload from $($setup.FullName).\" }",
+        "$b = [IO.File]::ReadAllBytes($payload.FullName)",
+        "if ([Text.Encoding]::ASCII.GetString($b, 0, 4) -ne 'PPKM') { throw 'Unrecognized Pulse installer payload.' }",
+        "$off = 8 + [BitConverter]::ToUInt32($b, 4)",
+        "foreach ($f in ([Text.Encoding]::UTF8.GetString($b, 8, $off - 8) | ConvertFrom-Json).files) { $dest = Join-Path $dir ($f.path -replace '/', '\\'); New-Item -ItemType Directory (Split-Path $dest) -Force | Out-Null; $fs = [IO.File]::Create($dest); $fs.Write($b, $off, $f.size); $fs.Close(); $off += $f.size }",
+        "Remove-Item \"$dir\\_payload\", $setup.FullName -Recurse -Force"
+    ],
+    "bin": "pulse.exe",
+    "shortcuts": [
+        [
+            "pulse.exe",
+            "Pulse"
+        ]
+    ],
+    "post_install": [
+        "# Pulse's launcher refuses any junction in its own path (exit code 50), so retarget the Start Menu shortcut and shim from scoop's 'current' link to the versioned directory.",
+        "$real = Join-Path (Split-Path $dir) $version",
+        "$lnk = Join-Path (shortcut_folder $global) 'Pulse.lnk'",
+        "$ws = New-Object -ComObject WScript.Shell",
+        "$s = $ws.CreateShortcut($lnk)",
+        "$s.TargetPath = \"$real\\pulse.exe\"",
+        "$s.WorkingDirectory = $real",
+        "$s.Save()",
+        "$shim = Join-Path (shimdir $global) 'pulse.shim'",
+        "if (Test-Path $shim) { (Get-Content $shim) | ForEach-Object { $_.Replace($dir, $real) } | Set-Content $shim -Encoding Ascii }"
+    ],
+    "checkver": {
+        "url": "https://github.com/jimmgreen/pulse/releases/latest/download/update-manifest.json",
+        "jsonpath": "$.version"
+    },
+    "autoupdate": {
+        "url": "https://github.com/jimmgreen/pulse/releases/download/v$version/PulseSetup-$version.exe",
+        "hash": {
+            "url": "https://github.com/jimmgreen/pulse/releases/latest/download/update-manifest.json",
+            "jsonpath": "$.installer_sha256"
+        }
+    },
+    "notes": [
+        "Enhancement packs (ffmpeg, images, raw, AI, content search) are downloaded and managed by Pulse itself, outside the install directory."
+    ]
+}
